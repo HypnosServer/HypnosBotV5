@@ -32,4 +32,5 @@ pub async fn embed(
 
 mod prelude {
     pub use super::{Context, Error, embed};
+    pub use poise::command;
 }

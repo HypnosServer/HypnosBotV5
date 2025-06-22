@@ -1,15 +1,15 @@
 public:
- age
- api
- hardware
- help
- invite
- iscore
- list
+ age        X
+ api        -
+ hardware   X
+ help       -
+ invite     X
+ iscore     
+ list       X
  ping
  role
- score
+ score      X
  test
- tps
- website
- worldsize
+ tps        X
+ website    X
+ worldsize  X
