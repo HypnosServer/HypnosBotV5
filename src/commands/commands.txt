@@ -1,0 +1,15 @@
+public:
+ age
+ api
+ hardware
+ help
+ invite
+ iscore
+ list
+ ping
+ role
+ score
+ test
+ tps
+ website
+ worldsize

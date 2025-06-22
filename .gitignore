@@ -1,0 +1,14 @@
+*
+
+!.gitignore
+
+!src/
+!src/*
+!src/**
+
+!Cargo.toml
+
+!config.json
+
+!data/
+!data/hardware.json

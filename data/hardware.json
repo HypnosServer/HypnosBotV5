@@ -1,0 +1,25 @@
+{
+    "servers": [
+        {
+            "name": "Hypnos Main Server",
+            "cpu": "Ryzen 5 5600x",
+            "ram": "16GB DDR4 3600mhz",
+            "drives": "480GB SSD",
+            "gpu": "epic gpu i found on the floor"
+        },
+        {
+            "name": "Hypnos Secondary Server",
+            "cpu": "Xeon 1245 V3",
+            "ram": "16GB DDR3 1333mhz",
+            "drives": "2x 500GB HDD",
+            "gpu": "powerful intel igpu"
+        },
+        {
+            "name": "Hypnos Offsite/web Server",
+            "cpu": "Celeron J1900",
+            "ram": "4GB DDR3L 1333mhz",
+            "drives": "500GB HDD",
+            "gpu": "crazy fast igpu"
+        }
+    ]
+}
