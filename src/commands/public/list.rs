@@ -1,17 +1,14 @@
-use poise::CreateReply;
-
-use crate::{fetch_latest_with_type, TaurusChannel};
+use crate::{TaurusChannel, fetch_latest_with_type};
 
 use crate::commands::prelude::*;
 
 //// Lists the online players on the Hypnos server
 #[command(slash_command, prefix_command)]
-pub async fn list(
-    ctx: Context<'_>,
-) -> Result<(), Error> {
+pub async fn list(ctx: Context<'_>) -> Result<(), Error> {
     let cache = {
         let data = ctx.serenity_context().data.read().await;
-        let (sender, cache) = data.get::<TaurusChannel>()
+        let (sender, cache) = data
+            .get::<TaurusChannel>()
             .expect("TaurusChannel not found in context data");
         sender.send("LIST".to_owned()).await?;
         cache.clone()
@@ -22,13 +19,9 @@ pub async fn list(
     } else {
         "```No players are currently online.```".to_string()
     };
-    let embed = embed(&ctx).await?
-        .title("Online players")
-        .description(desc);
+    let embed = embed(&ctx).await?.title("Online players").description(desc);
 
-    let reply = CreateReply::default()
-        .embed(embed);
+    let reply = CreateReply::default().embed(embed);
     ctx.send(reply).await?;
     Ok(())
 }
-    

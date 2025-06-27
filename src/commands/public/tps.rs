@@ -1,24 +1,24 @@
-use std::{io::{BufReader, Read}, path::PathBuf};
+use std::{
+    io::{BufReader, Read},
+    path::PathBuf,
+};
 
-use flate2::{bufread::GzDecoder, GzBuilder};
-use poise::CreateReply;
-use valence_nbt::{from_binary, Value};
+use flate2::{GzBuilder, bufread::GzDecoder};
+use valence_nbt::{Value, from_binary};
 
-use crate::{commands::prelude::*, Config};
+use crate::{Config, commands::prelude::*};
 
 #[command(slash_command, prefix_command)]
-pub async fn tps(
-    ctx: Context<'_>,
-) -> Result<(), Error> {
+pub async fn tps(ctx: Context<'_>) -> Result<(), Error> {
     let worlds = {
         let data = ctx.serenity_context().data.read().await;
-        let config = data.get::<Config>()
+        let config = data
+            .get::<Config>()
             .expect("TaurusChannel not found in context data");
         config.worlds.clone()
     };
 
-    let mut embed = embed(&ctx).await?
-        .title("Hypnos Server TPS");
+    let mut embed = embed(&ctx).await?.title("Hypnos Server TPS");
     for world in worlds {
         let mut new = None;
         for file_name in ["level.dat", "leve.dat_old"] {
@@ -26,12 +26,13 @@ pub async fn tps(
             if !path.exists() {
                 continue;
             }
-            let file = std::fs::File::open(&path)
-                .map_err(|e| format!("unable to access world files"))?;
+            let file =
+                std::fs::File::open(&path).map_err(|e| format!("unable to access world files"))?;
             let reader = BufReader::new(file);
             let mut buf = Vec::new();
             let mut decoder = GzDecoder::new(reader);
-            decoder.read_to_end(&mut buf)
+            decoder
+                .read_to_end(&mut buf)
                 .map_err(|e| format!("failed to read world files"))?;
             let (nbt, _) = from_binary::<String>(&mut buf.as_slice())
                 .map_err(|e| format!("failed to parse world files"))?;
@@ -54,13 +55,11 @@ pub async fn tps(
                 if tps > 20.0 {
                     tps = 20.0;
                 }
-                embed = embed
-                    .field(world.name.clone(), format!("{:.2} TPS", tps), false);
+                embed = embed.field(world.name.clone(), format!("{:.2} TPS", tps), false);
             }
         }
     }
-    let reply = CreateReply::default()
-        .embed(embed);
+    let reply = CreateReply::default().embed(embed);
 
     ctx.send(reply).await?;
     Ok(())

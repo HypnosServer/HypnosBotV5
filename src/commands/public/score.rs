@@ -1,12 +1,17 @@
-use std::{collections::HashSet, fs::{read_to_string, File}, io::{BufReader, Read}, ops::Deref, path::PathBuf};
+use std::{
+    collections::HashSet,
+    fs::{File, read_to_string},
+    io::{BufReader, Read},
+    ops::Deref,
+    path::PathBuf,
+};
 
 use flate2::bufread::GzDecoder;
-use futures::{future, Stream, StreamExt};
-use poise::{command, CreateReply};
+use futures::{Stream, StreamExt, future};
 use serde::Deserialize;
-use valence_nbt::{from_binary, Compound, List, Value};
+use valence_nbt::{Compound, List, Value, from_binary};
 
-use crate::{commands::prelude::*, CachedScoreboard, Scoreboard, Scoreboards};
+use crate::{Scoreboards, commands::prelude::*, scoreboard::Scoreboard};
 
 struct Objective {
     name: String,
@@ -22,7 +27,8 @@ struct Player {
 
 fn get_whitelist(path: PathBuf) -> Result<HashSet<String>, String> {
     let file = read_to_string(path).map_err(|e| format!("Failed to read whitelist file: {}", e))?;
-    let players: Vec<Player> = serde_json::from_str(&file).map_err(|e| format!("Failed to parse whitelist file: {}", e))?;
+    let players: Vec<Player> = serde_json::from_str(&file)
+        .map_err(|e| format!("Failed to parse whitelist file: {}", e))?;
     let mut whitelist = HashSet::new();
     for player in players {
         whitelist.insert(player.name);
@@ -33,7 +39,8 @@ fn get_whitelist(path: PathBuf) -> Result<HashSet<String>, String> {
 async fn get_scoreboard<'a>(ctx: Context<'a>, name: String) -> Option<Scoreboard> {
     let should_update = {
         let data = ctx.serenity_context().data.read().await;
-        let scoreboards = data.get::<Scoreboards>()
+        let scoreboards = data
+            .get::<Scoreboards>()
             .expect("Scoreboards not found in context data");
         if let Some(scoreboard) = scoreboards.scoreboards.get(&name) {
             scoreboard.should_update()
@@ -43,12 +50,14 @@ async fn get_scoreboard<'a>(ctx: Context<'a>, name: String) -> Option<Scoreboard
     };
     if should_update {
         let mut data = ctx.serenity_context().data.write().await;
-        let scoreboards = data.get_mut::<Scoreboards>()
+        let scoreboards = data
+            .get_mut::<Scoreboards>()
             .expect("Scoreboards not found in context data");
         scoreboards.load_scoreboard(&name).ok()?;
     }
     let data = ctx.serenity_context().data.read().await;
-    let scoreboards = data.get::<Scoreboards>()
+    let scoreboards = data
+        .get::<Scoreboards>()
         .expect("Scoreboards not found in context data");
     scoreboards.scoreboards.get(&name).cloned()
 }
@@ -72,17 +81,17 @@ fn not_creaturas_furry_search(name: &str, term: &str) -> f64 {
     matches as f64 / name.len() as f64
 }
 
-
 async fn score_autocomplete_board<'a>(
     ctx: Context<'a>,
-    partial: &'a str
+    partial: &'a str,
 ) -> impl Stream<Item = String> + 'a {
     let names = {
         let mut names = vec![];
         let should_update;
         {
             let data = ctx.serenity_context().data.read().await;
-            let scoreboards = data.get::<Scoreboards>()
+            let scoreboards = data
+                .get::<Scoreboards>()
                 .expect("Scoreboards not found in context data");
             should_update = scoreboards.scoreboard_names.should_update();
             if !should_update {
@@ -91,7 +100,8 @@ async fn score_autocomplete_board<'a>(
         }
         if should_update {
             let mut data = ctx.serenity_context().data.write().await;
-            let scoreboards = data.get_mut::<Scoreboards>()
+            let scoreboards = data
+                .get_mut::<Scoreboards>()
                 .expect("Scoreboards not found in context data");
             scoreboards.load_names();
             names = scoreboards.scoreboard_names.names.clone();
@@ -99,8 +109,7 @@ async fn score_autocomplete_board<'a>(
         names
     };
 
-    futures::stream::iter(
-        names)
+    futures::stream::iter(names)
         .filter(move |name| {
             let name = name.to_lowercase();
             let partial = partial.to_lowercase();
@@ -129,6 +138,16 @@ fn format_with_spaces(n: i64) -> String {
     }
 }
 
+pub async fn handle_error(ctx: Context<'_>, error: &str) -> Result<(), Error> {
+    ctx.send(CreateReply::default().content(format!("Error: {}", error)))
+        .await?;
+    Ok(())
+}
+
+/// Displays the scoreboard for a given board
+///
+/// # Arguments
+/// * `board` - The name of the board to display scores for
 #[command(slash_command, prefix_command)]
 pub async fn score(
     ctx: Context<'_>,
@@ -140,25 +159,32 @@ pub async fn score(
     let scoreboard = match scoreboard {
         Some(scoreboard) => scoreboard,
         None => {
-            ctx.send(CreateReply::default().content(format!("No scoreboard found for `{}`", board))).await?;
+            ctx.send(
+                CreateReply::default().content(format!("No scoreboard found for `{}`", board)),
+            )
+            .await?;
             return Ok(());
         }
     };
     let mut player_string = String::from("```0 Total\n");
     // Format total as 1 230 000 (1.2M)
-    let mut score_string = format!("```{} ({:.1}M)\n", format_with_spaces(scoreboard.total), scoreboard.total as f64 / 1_000_000.0);
+    let mut score_string = format!(
+        "```{} ({:.1}M)\n",
+        format_with_spaces(scoreboard.total),
+        scoreboard.total as f64 / 1_000_000.0
+    );
     for (i, (player, score)) in scoreboard.scores.iter().enumerate() {
         player_string.push_str(&format!("{} {}\n", i + 1, player));
         score_string.push_str(&format!("{}\n", score));
     }
     player_string.push_str("```");
     score_string.push_str("```");
-    let embed = embed(&ctx).await?
+    let embed = embed(&ctx)
+        .await?
         .title(format!("Score: {}", board))
         .field("Player", player_string, true)
         .field("Score", score_string, true);
-    let reply = CreateReply::default()
-        .embed(embed);
+    let reply = CreateReply::default().embed(embed);
     ctx.send(reply).await?;
 
     Ok(())
