@@ -155,26 +155,35 @@ pub async fn score(
 
     let base_embed = embed(&ctx).await?
         .title(format!("Scoreboard: {}", board));
+    let base_player_string = String::from("```0 Total\n");
+    // Format total as 1 230 000 (1.2M)
+    let base_score_string = format!(
+        "```{} ({:.1}M)\n",
+        format_with_spaces(scoreboard.total),
+        scoreboard.total as f64 / 1_000_000.0
+    );
+    let mut player_string = base_player_string.clone();
+    let mut score_string = base_score_string.clone();
     let mut embeds = vec![];
-    for chunk in scoreboard.scores.iter().enumerate().array_chunks::<10>() {
-        let mut player_string = String::from("```0 Total\n");
-        // Format total as 1 230 000 (1.2M)
-        let mut score_string = format!(
-            "```{} ({:.1}M)\n",
-            format_with_spaces(scoreboard.total),
-            scoreboard.total as f64 / 1_000_000.0
-        );
-        for (i, (player, score)) in chunk {
-            player_string.push_str(&format!("{} {}\n", i + 1, player));
-            score_string.push_str(&format!("{}\n", format_with_spaces(*score as i64)));
+    let mut count = 0;
+    for (i, (player, score)) in scoreboard.scores.iter().enumerate() {
+        count += 1;
+
+
+        player_string.push_str(&format!("{} {}\n", i + 1, player));
+        score_string.push_str(&format!("{}\n", format_with_spaces(*score as i64)));
+        if count % 10 == 0 {
+            player_string.push_str("```");
+            score_string.push_str("```");
+            embeds.push(
+                base_embed.clone()
+                    .field("Player", player_string, true)
+                    .field("Score", score_string, true),
+            );
+            player_string = base_player_string.clone();
+            score_string = base_score_string.clone();
         }
-        player_string.push_str("```");
-        score_string.push_str("```");
-        embeds.push(
-            base_embed.clone()
-                .field("Player", player_string, true)
-                .field("Score", score_string, true),
-        );
+
     }
 
     paginate(ctx, &embeds)

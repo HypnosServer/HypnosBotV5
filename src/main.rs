@@ -1,4 +1,3 @@
-#![feature(iter_array_chunks)]
 pub mod commands;
 pub mod config;
 pub mod scoreboard;
