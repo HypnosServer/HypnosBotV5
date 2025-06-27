@@ -35,7 +35,7 @@ impl ScoreboardNames {
 #[derive(Debug, Clone)]
 pub struct Scoreboard {
     pub name: String,
-    pub scores: HashMap<String, i32>,
+    pub scores: Vec<(String, i32)>,
     pub total: i64,
     last_update: std::time::Instant,
 }
@@ -44,13 +44,13 @@ impl Scoreboard {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            scores: HashMap::new(),
+            scores: Vec::new(),
             total: 0,
             last_update: std::time::Instant::now(),
         }
     }
 
-    pub fn update(&mut self, scores: HashMap<String, i32>, total: i64) {
+    pub fn update(&mut self, scores: Vec<(String, i32)>, total: i64) {
         self.scores = scores;
         self.total = total;
         self.last_update = std::time::Instant::now();
@@ -135,7 +135,7 @@ impl CachedScoreboard {
             return Err("No player scores found in scoreboard".to_string());
         };
 
-        let mut scores = HashMap::new();
+        let mut scores = Vec::new();
         let mut total = 0;
         for score in player_scores.iter() {
             if let Value::Compound(compound) = score.to_value() {
@@ -146,7 +146,7 @@ impl CachedScoreboard {
                                 continue;
                             }
                             if let Some(Value::Int(score_value)) = compound.get("Score") {
-                                scores.insert(player_name.to_string(), *score_value);
+                                scores.push((player_name.to_string(), *score_value));
                                 total += *score_value as i64;
                             }
                         }
@@ -154,6 +154,7 @@ impl CachedScoreboard {
                 }
             }
         }
+        scores.sort_by(|a, b| b.1.cmp(&a.1));
 
         if scores.is_empty() {
             return Err(format!("No scores found for objective '{}'", name));
