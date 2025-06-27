@@ -4,6 +4,7 @@ use poise::serenity_prelude::{CreateEmbed, CreateEmbedFooter, prelude::TypeMap};
 
 use crate::Config;
 
+pub mod member;
 pub mod public;
 
 type Data = ();
