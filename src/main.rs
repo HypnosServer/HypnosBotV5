@@ -84,14 +84,6 @@ impl EventHandler for Handler {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    let scoreboard_dat = include_bytes!("../data/scoreboard.dat");
-    let mut buf = Vec::new();
-    let mut gz = GzDecoder::new(scoreboard_dat.as_ref());
-    gz.read_to_end(&mut buf)
-        .expect("Failed to decompress scoreboard.dat");
-    let (scoreboard, _) = valence_nbt::from_binary::<String>(&mut buf.as_slice())
-        .expect("Failed to parse scoreboard.dat");
-    println!("Scoreboard: {:#?}", scoreboard);
 
     let config_json = read_to_string("config.json").expect("Failed to read config.json");
     let config: ConfigValue =
