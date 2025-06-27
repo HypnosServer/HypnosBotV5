@@ -6,6 +6,7 @@ use crate::Config;
 
 pub mod member;
 pub mod public;
+pub mod staff;
 
 type Data = ();
 

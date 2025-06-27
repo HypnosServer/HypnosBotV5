@@ -2,10 +2,10 @@ use poise::serenity_prelude::RoleId;
 
 use crate::{Config, commands::prelude::*};
 
-use super::check_role;
+use super::check_member;
 
 /// Gets the invite link for the Hypnos Discord server
-#[command(slash_command, prefix_command, check = "check_role")]
+#[command(slash_command, prefix_command, check = "check_member")]
 pub async fn grinder(ctx: Context<'_>) -> Result<(), Error> {
     let role_id = {
         let data = ctx.serenity_context().data.read().await;

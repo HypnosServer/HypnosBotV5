@@ -20,6 +20,7 @@ use poise::serenity_prelude::prelude::TypeMapKey;
 use poise::serenity_prelude::{
     ChannelId, Client, Command, Context, EventHandler, GatewayIntents, Message, Ready, async_trait,
 };
+use poise::Prefix;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -31,173 +32,12 @@ use valence_nbt::{Value, from_binary};
 use crate::commands::{member, public};
 use crate::config::{Config, ConfigValue};
 use crate::scoreboard::{CachedScoreboard, Scoreboards};
-use crate::taurus::TaurusChannel;
+use crate::taurus::{send_message, taurus_connection, TaurusChannel};
 
 #[derive(Debug)]
 struct Handler;
 
-async fn auth_taurus(ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>) -> Result<(), ()> {
-    let password = env::var("TAURUS_PASS").expect("Expected a TAURUS_PASS environment variable");
 
-    ws.send(WSMessage::text(password)).await.or(Err(()))?;
-    ws.send(WSMessage::text("PING")).await.or(Err(()))?;
-    let Some(Ok(msg)) = ws.next().await else {
-        println!("Failed to receive authentication response from Taurus");
-        return Err(());
-    };
-    if msg.as_text().unwrap_or("") != "PONG" {
-        println!("Authentication failed: expected 'PONG', got {:?}", msg);
-    }
-
-    Ok(())
-}
-
-fn split_incoming_msg<'a>(msg: &'a WSMessage) -> Option<(&'a str, &'a str)> {
-    let split = msg.as_text()?.split_once(" ");
-    split
-}
-
-async fn print_to_discord(channel: &ChannelId, ctx: &Context, msg: WSMessage) {
-    let (_command, content) = split_incoming_msg(&msg).expect("Failed to split incoming message");
-    channel
-        .say(&ctx.http, content)
-        .await
-        .expect("Failed to send message to Discord");
-}
-
-fn is_bridge(msg: &WSMessage) -> bool {
-    if let Some((command, _)) = split_incoming_msg(msg) {
-        command == "MSG"
-    } else {
-        false
-    }
-}
-
-async fn taurus_connection(
-    ctx: &Context,
-    mut rx: Receiver<String>,
-    mut command_responses: Arc<Mutex<Vec<String>>>,
-) {
-    let uri = Uri::from_static("ws://127.0.0.1:9000/taurus");
-    let (mut ws, _res) = ClientBuilder::from_uri(uri)
-        .connect()
-        .await
-        .expect("Failed to connect to Taurus WebSocket");
-    let channel = {
-        let data = ctx.data.read().await;
-        let id = data
-            .get::<Config>()
-            .expect("ChatBridge not found")
-            .chat_bridge;
-
-        ChannelId::new(id)
-    };
-
-    auth_taurus(&mut ws)
-        .await
-        .expect("Failed to authenticate with Taurus");
-    loop {
-        tokio::select! {
-            Some(msg) = rx.recv() => {
-                ws.send(WSMessage::text(msg)).await
-                    .expect("Failed to send message to Taurus");
-            },
-            Some(Ok(msg)) = ws.next() => {
-                if is_bridge(&msg) {
-                    print_to_discord(&channel, ctx, msg).await;
-                } else {
-                    let string = msg.as_text().unwrap();
-                    command_responses.lock().await.push(string.to_string());
-                }
-            }
-
-        }
-    }
-}
-
-fn mc_format(msg: &str, color: &[char]) -> String {
-    let mut formatted = String::new();
-    for c in color {
-        formatted.push('§');
-        formatted.push(*c);
-    }
-    formatted.push_str(msg);
-    formatted.push_str("§r");
-    formatted
-}
-
-pub async fn fetch_latest_with_type(
-    message_cache: Arc<Mutex<Vec<String>>>,
-    ty: &str,
-) -> Result<String, String> {
-    let mut tries = 0;
-    loop {
-        let mut cache = message_cache.lock().await;
-        if !cache.is_empty() {
-            if let Some(latest) = cache.last() {
-                if latest.starts_with(ty) {
-                    // Pop the latest message from the cache
-                    if let Some(message) = cache.pop() {
-                        return Ok(message);
-                    } else {
-                        return Err("Failed to pop message from cache".to_string());
-                    }
-                }
-            }
-        }
-        tries += 1;
-        if tries > 5 {
-            return Err("Timeout".to_string());
-        }
-        drop(cache); // Release the lock before sleeping
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-    }
-}
-
-async fn send_message(msg: Message, tx: &Sender<String>) {
-    let author_name = msg.author.name;
-    let content = msg.content;
-    let replying_to = msg.referenced_message;
-    let mut message = String::from("MSG ");
-    if let Some(reply) = replying_to {
-        message.push_str(&format!(
-            "reply -> {} {}\n",
-            mc_format(&reply.author.name, &['d']),
-            reply.content
-        ));
-    }
-    message.push_str(&format!(
-        "[{}] {}",
-        mc_format(&author_name, &['5']),
-        content
-    ));
-    tx.send(message)
-        .await
-        .expect("Failed to send message to Taurus channel");
-
-    let has_attachments = !msg.attachments.is_empty();
-    if has_attachments {
-        let text = if msg.attachments.len() == 1 {
-            "Attachment".to_string()
-        } else {
-            format!("Attachments ({})", msg.attachments.len())
-        };
-        tx.send(format!(
-            "MSG [{}] {}",
-            mc_format(&author_name, &['5']),
-            text
-        ))
-        .await
-        .expect("Failed to send attachment message to Taurus channel");
-        for attachment in msg.attachments {
-            let url = attachment.url;
-            let filename = attachment.filename;
-            tx.send(format!("URL {} {}", url, mc_format(&filename, &['9', 'n'])))
-                .await
-                .expect("Failed to send attachment URL to Taurus channel");
-        }
-    }
-}
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -234,10 +74,10 @@ impl EventHandler for Handler {
 
             data.insert::<TaurusChannel>((tx, command_responses.clone()));
         }
-        // Start the chat bridge in a separate task
         tokio::spawn(async move {
             taurus_connection(&ctx, rx, command_responses).await;
         });
+        println!("INFO: {} is connected!", ready.user.name);
     }
 }
 
@@ -254,6 +94,8 @@ async fn main() {
     println!("Scoreboard: {:#?}", scoreboard);
 
     let config_json = read_to_string("config.json").expect("Failed to read config.json");
+    let config: ConfigValue =
+    serde_json::from_str(&config_json).expect("Failed to parse config.json");
 
     // Login with a bot token from the environment
     let token = env::var("API_TOKEN").expect("Expected a token in the environment");
@@ -272,9 +114,11 @@ async fn main() {
                 public::invite(),
                 member::backup(),
                 member::grinder(),
+                member::session(),
+                member::reconnect(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
-                prefix: Some(";".to_string()),
+                prefix: config.prefix.first().cloned(),
                 ..Default::default()
             },
             ..Default::default()
@@ -303,18 +147,21 @@ async fn main() {
         .framework(framework)
         .await
         .expect("Error creating client");
-    let config: ConfigValue =
-        serde_json::from_str(&config_json).expect("Failed to parse config.json");
+
 
     {
+        
         let mut data = client.data.write().await;
+        let mut scoreboard_path = PathBuf::from(config.get_world_path("SMP").expect("Failed to get world path"));
+        scoreboard_path.push("data/scoreboard.dat");
         // Insert the chat bridge URL into the data
         data.insert::<Config>(config);
-        let scoreboard_path = PathBuf::from("data/scoreboard.dat");
+
         let cached_scoreboard = CachedScoreboard::new(scoreboard_path);
         data.insert::<Scoreboards>(cached_scoreboard);
     }
 
+    println!("INFO: Connecting to Discord...");
     // Start the client
     if let Err(why) = client.start().await {
         println!("Client error: {why:?}");

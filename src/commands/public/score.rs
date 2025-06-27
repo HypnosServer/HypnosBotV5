@@ -11,7 +11,7 @@ use futures::{Stream, StreamExt, future};
 use serde::Deserialize;
 use valence_nbt::{Compound, List, Value, from_binary};
 
-use crate::{Scoreboards, commands::prelude::*, scoreboard::Scoreboard};
+use crate::{commands::prelude::*, scoreboard::{Scoreboard, Scoreboards}};
 
 struct Objective {
     name: String,

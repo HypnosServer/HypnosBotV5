@@ -21,14 +21,15 @@ struct Session {
 
 use serde::Deserialize;
 
-use crate::{TaurusChannel, fetch_latest_with_type};
+use crate::taurus::fetch_latest_with_type;
+use crate::{TaurusChannel};
 
 use crate::commands::prelude::*;
 
-use super::check_role;
+use super::check_member;
 
 //// Lists the online players on the Hypnos server
-#[command(slash_command, prefix_command, check = "check_role")]
+#[command(slash_command, prefix_command, check = "check_member")]
 pub async fn session(ctx: Context<'_>) -> Result<(), Error> {
     let cache = {
         let data = ctx.serenity_context().data.read().await;

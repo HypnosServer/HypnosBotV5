@@ -8,7 +8,7 @@
 
 !Cargo.toml
 
-!config.json
+!example_config.json
 
 !data/
 !data/hardware.json

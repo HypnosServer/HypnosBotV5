@@ -1,8 +1,8 @@
 use poise::{CreateReply, serenity_prelude::CreateEmbed};
 
-use crate::{TaurusChannel, commands::prelude::*, fetch_latest_with_type};
+use crate::{commands::prelude::*, taurus::fetch_latest_with_type, TaurusChannel};
 
-use super::check_role;
+use super::check_member;
 
 async fn send_and_recieve(ctx: Context<'_>, cmd: String, args: String) -> Result<String, Error> {
     let cache = {
@@ -29,7 +29,7 @@ async fn send_and_recieve(ctx: Context<'_>, cmd: String, args: String) -> Result
     prefix_command,
     subcommands("ls", "rm", "new"),
     subcommand_required,
-    check = "check_role"
+    check = "check_member"
 )]
 pub async fn backup(_: Context<'_>) -> Result<(), Error> {
     Ok(())

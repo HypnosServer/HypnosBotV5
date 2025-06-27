@@ -1,4 +1,5 @@
-use crate::{TaurusChannel, fetch_latest_with_type};
+use crate::taurus::fetch_latest_with_type;
+use crate::{TaurusChannel};
 
 use crate::commands::prelude::*;
 
