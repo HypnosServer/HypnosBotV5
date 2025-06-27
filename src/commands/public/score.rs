@@ -54,6 +54,7 @@ async fn get_scoreboard<'a>(ctx: Context<'a>, name: String) -> Option<Scoreboard
             .get_mut::<Scoreboards>()
             .expect("Scoreboards not found in context data");
         scoreboards.load_scoreboard(&name).ok()?;
+        scoreboards.load_names().ok()?;
     }
     let data = ctx.serenity_context().data.read().await;
     let scoreboards = data
@@ -86,27 +87,11 @@ async fn score_autocomplete_board<'a>(
     partial: &'a str,
 ) -> impl Stream<Item = String> + 'a {
     let names = {
-        let mut names = vec![];
-        let should_update;
-        {
-            let data = ctx.serenity_context().data.read().await;
-            let scoreboards = data
-                .get::<Scoreboards>()
-                .expect("Scoreboards not found in context data");
-            should_update = scoreboards.scoreboard_names.should_update();
-            if !should_update {
-                names = scoreboards.scoreboard_names.names.clone();
-            }
-        }
-        if should_update {
-            let mut data = ctx.serenity_context().data.write().await;
-            let scoreboards = data
-                .get_mut::<Scoreboards>()
-                .expect("Scoreboards not found in context data");
-            scoreboards.load_names();
-            names = scoreboards.scoreboard_names.names.clone();
-        }
-        names
+        let data = ctx.serenity_context().data.read().await;
+        let scoreboards = data
+            .get::<Scoreboards>()
+            .expect("Scoreboards not found in context data");
+        scoreboards.scoreboard_names.names.clone()
     };
 
     futures::stream::iter(names)
