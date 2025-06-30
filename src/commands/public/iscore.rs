@@ -38,6 +38,11 @@ const SVG2: &str =
                         font-size: 60px;
                         fill: #BFBFBF;
                     }
+                    .total {
+                        text-anchor: start;
+                        font-size: 60px;
+                        fill: #FFFFFF;
+                    }
                 </style>
                 <rect height="100%" width="100%" fill='#36393F'></rect>
                 <text class="title" x="50%" y="60">"#;
@@ -63,7 +68,7 @@ pub async fn iscore(ctx: Context<'_>, board: String) -> Result<(), Error> {
     };
     let mut svg = format!("{} {} {} {} {} {}", SVG1, 900, (scoreboard.scores.len() as u32 + 1 + 1) * GLYPH_INTERVAL + GLYPH_PADDING * 2, SVG2, board, SVG3);
     svg += &format!(
-        "<text class=\"ign\" x=\"5px\" y=\"{}\">Total</text>
+        "<text class=\"total\" x=\"5px\" y=\"{}\">Total</text>
          <text class=\"score\" x=\"895px\" y=\"{}\">{}</text>",
         GLYPH_INTERVAL * 2,
         GLYPH_INTERVAL * 2,
