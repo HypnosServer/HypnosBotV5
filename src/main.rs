@@ -102,6 +102,7 @@ async fn main() {
                 public::age(),
                 public::hardware(),
                 public::score(),
+                public::iscore(),
                 public::list(),
                 public::invite(),
                 member::backup(),

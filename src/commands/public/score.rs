@@ -37,13 +37,13 @@ fn get_whitelist(path: PathBuf) -> Result<HashSet<String>, String> {
     Ok(whitelist)
 }
 
-async fn get_scoreboard<'a>(ctx: Context<'a>, name: String) -> Option<Scoreboard> {
+pub(super) async fn get_scoreboard<'a>(ctx: Context<'a>, name: &str) -> Option<Scoreboard> {
     let should_update = {
         let data = ctx.serenity_context().data.read().await;
         let scoreboards = data
             .get::<Scoreboards>()
             .expect("Scoreboards not found in context data");
-        if let Some(scoreboard) = scoreboards.scoreboards.get(&name) {
+        if let Some(scoreboard) = scoreboards.scoreboards.get(name) {
             scoreboard.should_update()
         } else {
             true
@@ -61,7 +61,7 @@ async fn get_scoreboard<'a>(ctx: Context<'a>, name: String) -> Option<Scoreboard
     let scoreboards = data
         .get::<Scoreboards>()
         .expect("Scoreboards not found in context data");
-    scoreboards.scoreboards.get(&name).cloned()
+    scoreboards.scoreboards.get(name).cloned()
 }
 
 const ACCURACY_THRESHOLD: f64 = 0.5;
@@ -104,7 +104,7 @@ async fn score_autocomplete_board<'a>(
         .map(|name| name.to_string())
 }
 
-fn format_with_spaces(n: i64) -> String {
+pub(super) fn format_with_spaces(n: i64) -> String {
     let s = n.abs().to_string();
     let mut result = String::new();
     let len = s.len();
@@ -141,7 +141,7 @@ pub async fn score(
     #[autocomplete = "score_autocomplete_board"]
     board: String,
 ) -> Result<(), Error> {
-    let scoreboard = get_scoreboard(ctx.clone(), board.clone()).await;
+    let scoreboard = get_scoreboard(ctx.clone(), &board).await;
     let scoreboard = match scoreboard {
         Some(scoreboard) => scoreboard,
         None => {
