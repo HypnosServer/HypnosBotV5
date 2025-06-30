@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use poise::serenity_prelude::CreateAttachment;
 use resvg::{tiny_skia, usvg::{self, Tree}};
 
 use super::score::get_scoreboard;
 
-use crate::commands::{prelude::*, public::score::format_with_spaces};
+use crate::commands::{prelude::*, public::score::{format_with_spaces, get_whitelist, score_autocomplete_board}};
 
 
 
@@ -52,9 +54,13 @@ const SVG3: &str = r#"</text>"#;
 const GLYPH_HEIGHT: u32 = 60;
 const GLYPH_PADDING: u32 = 6;
 const GLYPH_INTERVAL: u32 = GLYPH_HEIGHT + GLYPH_PADDING;
-
 #[command(slash_command, prefix_command)]
-pub async fn iscore(ctx: Context<'_>, board: String) -> Result<(), Error> {
+pub async fn iscore(
+    ctx: Context<'_>,
+    #[autocomplete = "score_autocomplete_board"]
+    board: String,
+    whitelist: Option<bool>
+) -> Result<(), Error> {
     let scoreboard = get_scoreboard(ctx, &board).await;
     let scoreboard = match scoreboard {
         Some(scoreboard) => scoreboard,
@@ -66,8 +72,16 @@ pub async fn iscore(ctx: Context<'_>, board: String) -> Result<(), Error> {
             return Ok(());
         }
     };
-    let mut svg = format!("{} {} {} {} {} {}", SVG1, 900, (scoreboard.scores.len() as u32 + 1 + 1) * GLYPH_INTERVAL + GLYPH_PADDING * 2, SVG2, board, SVG3);
-    svg += &format!(
+    let nowhitelist;
+    let whitelist = if let Some(false) = whitelist {
+        nowhitelist = true;
+        HashSet::new()
+    } else {
+        nowhitelist = false;
+        get_whitelist(ctx).await
+    };
+    let mut name_svg = String::new();
+    name_svg += &format!(
         "<text class=\"total\" x=\"5px\" y=\"{}\">Total</text>
          <text class=\"score\" x=\"895px\" y=\"{}\">{}</text>",
         GLYPH_INTERVAL * 2,
@@ -75,19 +89,24 @@ pub async fn iscore(ctx: Context<'_>, board: String) -> Result<(), Error> {
         format_with_spaces(scoreboard.total)
     );
     let mut position = 1;
-    for (score, value) in scoreboard.scores.iter() {
+    let mut ommitted_names = 0;
+    for (name, value) in scoreboard.scores.iter() {
+        if !whitelist.contains(name) && !nowhitelist {
+            ommitted_names += 1;
+            continue;
+        };
         let y = (position + 2) * GLYPH_INTERVAL;
-        svg += &format!(
+        name_svg += &format!(
             "<text class=\"ign\" x=\"5px\" y=\"{}\">{}</text>
              <text class=\"score\" x=\"895px\" y=\"{}\">{}</text>",
             y,
-            score,
+            name,
             y,
             value
         );
         position += 1;
     }
-    svg += "</svg>";
+    let svg = format!("{} {} {} {} {} {} {}</svg>", SVG1, 900, (scoreboard.scores.len() as u32 + 2 - ommitted_names) * GLYPH_INTERVAL + GLYPH_PADDING * 2, SVG2, board, SVG3, name_svg);
 
     let mut opt = usvg::Options::default();
     opt.fontdb_mut().load_font_file("data/minecraft_font.ttf")

@@ -145,8 +145,7 @@ async fn main() {
     {
         
         let mut data = client.data.write().await;
-        let mut scoreboard_path = PathBuf::from(config.get_world_path("SMP").expect("Failed to get world path"));
-        scoreboard_path.push("data/scoreboard.dat");
+        let scoreboard_path = PathBuf::from(config.get_world_path("SMP").expect("Failed to get world path"));
         // Insert the chat bridge URL into the data
         data.insert::<Config>(config);
 

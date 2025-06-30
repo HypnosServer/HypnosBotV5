@@ -26,15 +26,12 @@ struct Player {
     name: String,
 }
 
-fn get_whitelist(path: PathBuf) -> Result<HashSet<String>, String> {
-    let file = read_to_string(path).map_err(|e| format!("Failed to read whitelist file: {}", e))?;
-    let players: Vec<Player> = serde_json::from_str(&file)
-        .map_err(|e| format!("Failed to parse whitelist file: {}", e))?;
-    let mut whitelist = HashSet::new();
-    for player in players {
-        whitelist.insert(player.name);
-    }
-    Ok(whitelist)
+pub(super) async fn get_whitelist<'a>(ctx: Context<'a>) -> HashSet<String> {
+    let data = ctx.serenity_context().data.read().await;
+    let scoreboards = data
+        .get::<Scoreboards>()
+        .expect("Scoreboards not found in context data");
+    scoreboards.get_whitelist().clone()
 }
 
 pub(super) async fn get_scoreboard<'a>(ctx: Context<'a>, name: &str) -> Option<Scoreboard> {
@@ -83,7 +80,7 @@ fn not_creaturas_furry_search(name: &str, term: &str) -> f64 {
     matches as f64 / name.len() as f64
 }
 
-async fn score_autocomplete_board<'a>(
+pub(super) async fn score_autocomplete_board<'a>(
     ctx: Context<'a>,
     partial: &'a str,
 ) -> impl Stream<Item = String> + 'a {
@@ -140,6 +137,7 @@ pub async fn score(
     #[description = "The board to display scores for"]
     #[autocomplete = "score_autocomplete_board"]
     board: String,
+    whitelist: Option<bool>,
 ) -> Result<(), Error> {
     let scoreboard = get_scoreboard(ctx.clone(), &board).await;
     let scoreboard = match scoreboard {
@@ -151,6 +149,15 @@ pub async fn score(
             .await?;
             return Ok(());
         }
+    };
+
+    let nowhitelist;
+    let whitelist = if let Some(false) = whitelist {
+        nowhitelist = true;
+        HashSet::new()
+    } else {
+        nowhitelist = false;
+        get_whitelist(ctx).await
     };
 
     let base_embed = embed(&ctx).await?
@@ -166,11 +173,14 @@ pub async fn score(
     let mut score_string = base_score_string.clone();
     let mut embeds = vec![];
     let mut count = 0;
-    for (i, (player, score)) in scoreboard.scores.iter().enumerate() {
+    for (player, score) in scoreboard.scores.iter() {
+        if !whitelist.contains(player) && !nowhitelist {
+            continue;
+        }
         count += 1;
 
 
-        player_string.push_str(&format!("{} {}\n", i + 1, player));
+        player_string.push_str(&format!("{} {}\n", count, player));
         score_string.push_str(&format!("{}\n", format_with_spaces(*score as i64)));
         if count % 10 == 0 {
             player_string.push_str("```");

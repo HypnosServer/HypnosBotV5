@@ -1,17 +1,23 @@
 use std::{
-    collections::{HashMap, hash_map::Entry},
-    fs::File,
+    collections::{hash_map::Entry, HashMap, HashSet},
+    fs::{read_to_string, File},
     io::{BufReader, Read},
     path::PathBuf,
 };
 
 use flate2::bufread::GzDecoder;
 use poise::serenity_prelude::prelude::TypeMapKey;
+use serde::Deserialize;
 use valence_nbt::{Value, from_binary};
 
 pub struct ScoreboardNames {
     pub names: Vec<String>,
     last_update: std::time::Instant,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct WhitelistName {
+    name: String,
 }
 
 impl ScoreboardNames {
@@ -64,7 +70,7 @@ impl Scoreboard {
 pub struct CachedScoreboard {
     pub scoreboard_names: ScoreboardNames,
     pub scoreboards: HashMap<String, Scoreboard>,
-    // Bucket to delete scoreboards that are not used anymore
+    pub whitelist: HashSet<String>,
     path: PathBuf,
 }
 
@@ -73,6 +79,7 @@ impl CachedScoreboard {
         let mut s = Self {
             scoreboard_names: ScoreboardNames::new(),
             scoreboards: HashMap::new(),
+            whitelist: HashSet::new(),
             path,
         };
         s.load_names()
@@ -80,9 +87,20 @@ impl CachedScoreboard {
         s
     }
 
+    fn path(&self) -> PathBuf {
+        self.path.join("data/scoreboard.dat")
+    }
+
+    fn whitelist_path(&self) -> PathBuf {
+        let mut path = self.path.clone();
+        path.pop();
+        path.push("whitelist.json");
+        path
+    }
+
     pub fn load_names(&mut self) -> Result<(), String> {
         let mut file =
-            File::open(&self.path).map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
+            File::open(&self.path()).map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
         let mut buf = Vec::new();
         let mut d = GzDecoder::new(BufReader::new(&mut file));
         d.read_to_end(&mut buf)
@@ -112,6 +130,20 @@ impl CachedScoreboard {
                 }
             })
             .collect::<Vec<String>>();
+
+
+        let whitelist_string = read_to_string(self.whitelist_path())
+            .map_err(|e| format!("Failed to read whitelist file: {}", e))?;
+        let whitelist: Vec<WhitelistName> = serde_json::from_str(&whitelist_string)
+            .map_err(|e| format!("Failed to parse whitelist file: {}", e))?;
+
+        let whitelist = whitelist
+            .into_iter()
+            .map(|player| player.name)
+            .collect::<HashSet<String>>();
+
+        self.whitelist = whitelist;
+
         self.scoreboard_names.update(names);
 
         Ok(())
@@ -119,7 +151,7 @@ impl CachedScoreboard {
 
     pub fn load_scoreboard(&mut self, name: &str) -> Result<(), String> {
         let mut file =
-            File::open(&self.path).map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
+            File::open(&self.path()).map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
         let mut buf = Vec::new();
         let mut d = GzDecoder::new(BufReader::new(&mut file));
         d.read_to_end(&mut buf)
@@ -180,6 +212,10 @@ impl CachedScoreboard {
         self.scoreboards
             .get(name)
             .ok_or_else(|| format!("Scoreboard '{}' not found", name))
+    }
+
+    pub fn get_whitelist(&self) -> &HashSet<String> {
+        &self.whitelist
     }
 }
 
