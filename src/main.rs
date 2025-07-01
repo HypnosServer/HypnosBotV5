@@ -2,6 +2,7 @@ pub mod commands;
 pub mod config;
 pub mod scoreboard;
 pub mod taurus;
+pub mod anvil;
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -29,6 +30,7 @@ use tokio_websockets::{
 };
 use valence_nbt::{Value, from_binary};
 
+use crate::anvil::run_anvil;
 use crate::commands::{member, public};
 use crate::config::{Config, ConfigValue};
 use crate::scoreboard::{CachedScoreboard, Scoreboards};
@@ -68,14 +70,25 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let command_responses = Arc::new(Mutex::new(Vec::new()));
+        let world_path;
         {
             let mut data = ctx.data.write().await;
             // Create a channel for Taurus messages
 
             data.insert::<TaurusChannel>((tx, command_responses.clone()));
+            world_path = data
+                .get::<Config>()
+                .expect("Config not found")
+                .get_world_path("SMP")
+                .expect("Failed to get world path");
         }
+        let taurus_ctx = ctx.clone();
         tokio::spawn(async move {
-            taurus_connection(&ctx, rx, command_responses).await;
+            taurus_connection(&taurus_ctx, rx, command_responses).await;
+        });
+        let anvil_ctx = ctx.clone();
+        tokio::spawn(async move {
+            run_anvil(&anvil_ctx, PathBuf::from(world_path)).await;
         });
         println!("INFO: {} is connected!", ready.user.name);
     }
@@ -85,9 +98,11 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv::dotenv().ok();
 
+
     let config_json = read_to_string("config.json").expect("Failed to read config.json");
     let config: ConfigValue =
     serde_json::from_str(&config_json).expect("Failed to parse config.json");
+
 
     // Login with a bot token from the environment
     let token = env::var("API_TOKEN").expect("Expected a token in the environment");

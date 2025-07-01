@@ -2,6 +2,7 @@ mod backup;
 mod grinder;
 mod session;
 mod reconnect;
+mod metadata;
 
 pub use backup::backup;
 pub use grinder::grinder;

@@ -26,6 +26,7 @@ pub struct ConfigValue {
     pub grinder_role: u64,
     pub worlds: Vec<World>,
     pub chat_bridge: u64,
+    pub info_channel: u64,
     pub embed_opts: EmbedOpts,
 }
 

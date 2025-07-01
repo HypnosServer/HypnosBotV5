@@ -10,6 +10,7 @@
         { "name": "CMP", "path": "/home/server/Desktop/cmp/hypnos_cmp" }
     ],
     "chatBridge": 1386044501302317177,
+    "infoChannel": 1389396461149749278,
     "embedOpts": {
         "colour": "#7289da",
         "footerText": "HypnosBot",
