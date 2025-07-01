@@ -169,9 +169,11 @@ pub async fn run_anvil(
 ) {
     let mut world = World::new(world_path);
     let mut message: Option<Message> = None;
-    let info_channel = ctx.data.read().await.get::<Config>()
+    let info_channel = {
+        ctx.data.read().await.get::<Config>()
         .and_then(|config| Some(config.info_channel))
-        .unwrap_or(0);
+        .unwrap_or(0)
+    };
     let channel_id = ChannelId::new(info_channel);
     loop {
         let instant = std::time::Instant::now();
