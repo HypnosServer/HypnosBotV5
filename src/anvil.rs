@@ -65,7 +65,6 @@ impl World {
 }
 
 fn run_loop(world: &mut World) -> Vec<String> {
-    return Vec::new();
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
