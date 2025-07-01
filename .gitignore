@@ -12,3 +12,6 @@
 
 !data/
 !data/hardware.json
+
+!anvil_script/
+!anvil_script/anvil.py
