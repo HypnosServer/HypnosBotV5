@@ -30,7 +30,7 @@ def eps_storage():
 
     _, gp_10  = get_block("nether", 163, 15, 1578)
     if gp_10 > 4:
-        gp_10 = 0
+        gp_10 = ""
     _, gp_1   = get_block("nether", 163, 15, 1582)
     _, gp_dec = get_block("nether", 163, 15, 1588)
 
@@ -39,11 +39,11 @@ def eps_storage():
 
     _, bone_10  = get_block("nether", 129, 15, 1590)
     if bone_10 > 4:
-        bone_10 = 0
+        bone_10 = ""
     _, bone_1   = get_block("nether", 129, 15, 1586)
     _, bone_dec = get_block("nether", 129, 15, 1580)
 
-    print(f"PRINT EPS Storage | Gunpowder: {gp_10}{gp_1}.{gp_dec} ({gp_percent_10}{gp_percent_1}%), Bones: {bone_10}{bone_1}.{bone_dec} ({bone_percent_10}{bone_percent_1}%)")
+    print(f"PRINT EPS Storage | Gunpowder: {gp_10}{gp_1}.{gp_dec}M ({gp_percent_10}{gp_percent_1}%), Bones: {bone_10}{bone_1}.{bone_dec}M ({bone_percent_10}{bone_percent_1}%)")
 
 
 
