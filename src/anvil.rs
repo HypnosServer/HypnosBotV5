@@ -42,9 +42,9 @@ fn get_block(x: i64, y: i64, z: i64, chunk: Compound) -> Option<(u8, u8)> {
     // Data is packed in 4-bit nibbles, so we need to extract the correct nibble
     let data_index = block_index / 2;
     let data_value = if rest == 0 {
-        data.get(data_index as usize)? >> 4
-    } else {
         data.get(data_index as usize)? & 0x0F
+    } else {
+        data.get(data_index as usize)? >> 4 & 0x0F
     };
     Some((*block_id as u8, data_value as u8))
 
