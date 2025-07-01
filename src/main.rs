@@ -70,17 +70,14 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let command_responses = Arc::new(Mutex::new(Vec::new()));
-        let world_path;
         {
             let mut data = ctx.data.write().await;
             // Create a channel for Taurus messages
 
             data.insert::<TaurusChannel>((tx, command_responses.clone()));
-            world_path = data
+            let config = data
                 .get::<Config>()
-                .expect("Config not found")
-                .get_world_path("SMP")
-                .expect("Failed to get world path");
+                .expect("Config not found");
         }
         let taurus_ctx = ctx.clone();
         tokio::spawn(async move {
@@ -88,7 +85,7 @@ impl EventHandler for Handler {
         });
         let anvil_ctx = ctx.clone();
         tokio::spawn(async move {
-            run_anvil(&anvil_ctx, PathBuf::from(world_path)).await;
+            run_anvil(&anvil_ctx).await;
         });
         println!("INFO: {} is connected!", ready.user.name);
     }

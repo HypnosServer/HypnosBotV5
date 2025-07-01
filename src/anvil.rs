@@ -1,6 +1,7 @@
-use std::{io::{BufRead, Read, Write}, path::PathBuf, process::Command};
+use std::{io::{BufRead, Read, Write}, path::PathBuf, process::Command, sync::Arc};
 
-use poise::serenity_prelude::{ChannelId, Context, CreateEmbedFooter, CreateMessage, EditMessage, GuildId, Message};
+use poise::serenity_prelude::{ChannelId, Context, CreateEmbedFooter, CreateMessage, EditMessage, GuildId, Http, Message, MessageId};
+use tokio::time::sleep;
 use valence_anvil::RegionFolder;
 use valence_nbt::{Compound, Value};
 
@@ -64,6 +65,7 @@ impl World {
 }
 
 fn run_loop(world: &mut World) -> Vec<String> {
+    return Vec::new();
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
@@ -165,49 +167,49 @@ fn run_loop(world: &mut World) -> Vec<String> {
 
 pub async fn run_anvil(
     ctx: &Context,
-    world_path: PathBuf,
 ) {
-    let mut world = World::new(world_path);
     let mut message: Option<Message> = None;
-    let info_channel = {
-        ctx.data.read().await.get::<Config>()
-        .and_then(|config| Some(config.info_channel))
-        .unwrap_or(0)
+    let (channel, world_path) = {
+        let data = ctx.data.read().await;
+        let config = data.get::<Config>().expect("Config not found");
+        let channel = ChannelId::new(config.info_channel);
+        let world_path = config.get_world_path("SMP")
+            .expect("World path not found for SMP");
+        (channel, PathBuf::from(world_path))
     };
-    let channel_id = ChannelId::new(info_channel);
+    let mut world = World::new(world_path);
     loop {
         let instant = std::time::Instant::now();
-        let prints = run_loop(&mut world);
-        println!("Anvil prints: {:?}", prints);
-        // Sleep for 45 seconds since instant
-        let duration_since_epoch = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or(std::time::Duration::new(0, 0))
-            .as_secs();
-        let mut embed = poise::serenity_prelude::CreateEmbed::default()
-            .title("Info Board")
-            .description(format!("Last updated: <t:{}:R>", duration_since_epoch));
-        for print in prints {
-            let split = print.split_once('|').unwrap_or((&print, ""));
-            let (title, content) = split;
-            embed = embed.field(title.trim(), content.trim(), false);
-        }
-        // Duration since epoch without chrono
+        {
+            let prints = run_loop(&mut world);
+            let duration_since_epoch = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or(std::time::Duration::new(0, 0))
+                .as_secs();
+            let mut embed = poise::serenity_prelude::CreateEmbed::default()
+                .title("Info Board")
+                .description(format!("Last updated: <t:{}:R>", duration_since_epoch));
+            for print in prints {
+                let split = print.split_once('|').unwrap_or((&print, ""));
+                let (title, content) = split;
+                embed = embed.field(title.trim(), content.trim(), false);
+            }
 
-        if let Some(ref mut last_message) = message {
-            let edit_message = EditMessage::new()
-                .embed(embed);
-            last_message.edit(ctx, edit_message).await.ok();
 
-        } else {
-            let create_message = CreateMessage::new()
-                .embed(embed);
-            message = channel_id.send_message(ctx, create_message).await.ok();
+            if let Some(ref mut msg) = message {
+                let edit_message = EditMessage::new()
+                    .embed(embed);
+                msg.edit(&ctx, edit_message).await.ok();
+            } else {
+                let create_message = CreateMessage::new()
+                    .embed(embed);
+                message = channel.send_message(&ctx, create_message).await.ok()
+            }
         }
         let elapsed = instant.elapsed();
         let sec_45 = std::time::Duration::from_secs(45);
-        if elapsed.as_secs() < 45 {
-            std::thread::sleep(sec_45 - elapsed);
+        if elapsed < sec_45 {
+            sleep(sec_45 - elapsed).await;
         }
     }
 
