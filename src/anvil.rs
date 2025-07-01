@@ -28,7 +28,7 @@ fn get_block(x: i64, y: i64, z: i64, chunk: Compound) -> Option<(u8, u8)> {
     let Value::Compound(subchunk_data) = subchunk.to_value() else {
         return None;
     };
-    let block_index = ((y % 16) * 16 + (z % 16)) * 16 + (x % 16);
+    let block_index = (((16 + y) % 16) * 16 + ((16 + z) % 16)) * 16 + ((16 + x) % 16);
     let Some(Value::ByteArray(blocks)) = subchunk_data.get("Blocks") else {
         return None;
     };
