@@ -10,8 +10,8 @@ def get_block(dim, x, y, z) -> tuple:
     return int(block_id), int(block_meta)
 
 def ow_mobswitch():
-    block_id, block_meta = get_block("overworld", 0, 0, 0)
-    if block_id == 100:
+    block_id, block_meta = get_block("overworld", 19, 6, 397)
+    if block_id == 55 and block_meta == 15:
         print("PRINT Overworld switch | ON")
     else:
         print("PRINT Overworld switch | OFF")
