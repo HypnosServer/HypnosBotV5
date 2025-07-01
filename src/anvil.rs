@@ -175,11 +175,6 @@ pub async fn run_anvil(
         let prints = run_loop(&mut world);
         println!("Anvil prints: {:?}", prints);
         // Sleep for 45 seconds since instant
-        let elapsed = instant.elapsed();
-        let sec_45 = std::time::Duration::from_secs(45);
-        if elapsed.as_secs() < 45 {
-            std::thread::sleep(sec_45 - elapsed);
-        }
         let duration_since_epoch = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or(std::time::Duration::new(0, 0))
@@ -203,6 +198,11 @@ pub async fn run_anvil(
             let create_message = CreateMessage::new()
                 .embed(embed);
             message = channel_id.send_message(ctx, create_message).await.ok();
+        }
+        let elapsed = instant.elapsed();
+        let sec_45 = std::time::Duration::from_secs(45);
+        if elapsed.as_secs() < 45 {
+            std::thread::sleep(sec_45 - elapsed);
         }
     }
 
