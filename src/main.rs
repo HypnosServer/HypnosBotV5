@@ -10,18 +10,18 @@ use std::env;
 use std::fs::{File, read_to_string};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 
 use flate2::bufread::GzDecoder;
 use futures::lock::Mutex;
 use http::Uri;
+use poise::Prefix;
 use poise::samples::create_application_commands;
 use poise::serenity_prelude::futures::{SinkExt, StreamExt};
 use poise::serenity_prelude::prelude::TypeMapKey;
 use poise::serenity_prelude::{
     ChannelId, Client, Command, Context, EventHandler, GatewayIntents, Message, Ready, async_trait,
 };
-use poise::Prefix;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -34,12 +34,10 @@ use crate::anvil::run_anvil;
 use crate::commands::{member, public};
 use crate::config::{Config, ConfigValue};
 use crate::scoreboard::{CachedScoreboard, Scoreboards};
-use crate::taurus::{send_message, taurus_connection, TaurusChannel};
+use crate::taurus::{TaurusChannel, send_message, taurus_connection};
 
 #[derive(Debug)]
 struct Handler;
-
-
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -68,24 +66,25 @@ impl EventHandler for Handler {
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
-        let command_responses = Arc::new(Mutex::new(Vec::new()));
-        {
-            let mut data = ctx.data.write().await;
-            // Create a channel for Taurus messages
+        static START_CHILD_THREADS: Once = Once::new();
+        let mut data = ctx.data.write().await;
+        START_CHILD_THREADS.call_once(|| {
+            let (tx, rx) = tokio::sync::mpsc::channel(100);
+            let command_responses = Arc::new(Mutex::new(Vec::new()));
+            {
+                // Create a channel for Taurus messages
 
-            data.insert::<TaurusChannel>((tx, command_responses.clone()));
-            let config = data
-                .get::<Config>()
-                .expect("Config not found");
-        }
-        let taurus_ctx = ctx.clone();
-        tokio::spawn(async move {
-            taurus_connection(&taurus_ctx, rx, command_responses).await;
-        });
-        let anvil_ctx = ctx.clone();
-        tokio::spawn(async move {
-            run_anvil(&anvil_ctx).await;
+                data.insert::<TaurusChannel>((tx, command_responses.clone()));
+            }
+            let taurus_ctx = ctx.clone();
+            tokio::spawn(async move {
+                taurus_connection(&taurus_ctx, rx, command_responses).await;
+            });
+            let anvil_ctx = ctx.clone();
+            tokio::spawn(async move {
+                run_anvil(&anvil_ctx).await;
+            });
+            println!("INFO: Started child threads");
         });
         println!("INFO: {} is connected!", ready.user.name);
     }
