@@ -9,10 +9,15 @@ fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
         r#"{{"text":"Search results:\n", "bold": true, "color":"dark_blue"}}"#,
     ));
 
-    for name in entries.iter().take(max) {
+    for (i, name) in entries.iter().take(max).enumerate() {
+        let last = (i + 1) == entries.len() || (i + 1) == max;
+        let display = if last {
+            &name.display
+        } else {
+            &format!("{}\n", name.display)
+        };
         components.push(format!(
             r#"{{text":"  {display}","color":"blue","clickEvent":{{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent":{{"action":"show_text","value":[{{"text":"{real}"}}]}}}}"#,
-            display = name.display,
             real = name.real,
         ));
     }
@@ -42,7 +47,7 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
             //    return Ok(());
             //}
             search_results.sort_by(|a, b| a.real.cmp(&b.real));
-            let result_string = build_search_results(search_results, 10);
+            let result_string = build_search_results(search_results, 5);
             let cmd = format!("RCON {} tellraw @a {}", server, result_string);
             println!("{}", cmd);
             tx.send(cmd).await.expect("Taurus dead");
