@@ -1,4 +1,11 @@
-use crate::{commands::{prelude::Error, public::{get_scoreboard, search_scoreboards, SearchFunction}}, scoreboard::ScoreboardName, taurus::{mc_format, TaurusChannel}};
+use crate::{
+    commands::{
+        prelude::Error,
+        public::{SearchFunction, get_scoreboard, search_scoreboards},
+    },
+    scoreboard::ScoreboardName,
+    taurus::{TaurusChannel, mc_format},
+};
 use futures::{Stream, StreamExt, future};
 use poise::serenity_prelude::Context;
 
@@ -17,14 +24,13 @@ fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
             &format!("{}\n", name.display)
         };
         components.push(format!(
-            r#"{{text":"  {display}","color":"blue","clickEvent":{{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent":{{"action":"show_text","value":[{{"text":"{real}"}}]}}}}"#,
+            r#"{{"text":"  {display}","color":"blue","clickEvent":{{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent":{{"action":"show_text","value":[{{"text":"{real}"}}]}}}}"#,
             real = name.real,
         ));
     }
 
     format!(r#"[{}]"#, components.join(","))
 }
-
 
 pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error> {
     let scoreboard = get_scoreboard(ctx, board).await;
@@ -54,6 +60,11 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
             return Ok(());
         }
     };
-    tx.send(format!("RCON {} scoreboard objectives setdisplay sidebar {}", server, board)).await.expect("Taurus dead");
+    tx.send(format!(
+        "RCON {} scoreboard objectives setdisplay sidebar {}",
+        server, board
+    ))
+    .await
+    .expect("Taurus dead");
     Ok(())
 }
