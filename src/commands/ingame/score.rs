@@ -6,14 +6,13 @@ fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
     let mut components = Vec::new();
 
     components.push(format!(
-        r#"{{"text":"{}\n",}}"#,
-        mc_format("Search results:", &['5'])
+        r#"{{"text":"Search results:\n", "bold": true, "color":"dark_blue"}}"#,
     ));
 
     for name in entries.iter().take(max) {
         components.push(format!(
-            r#"{{"text":"  {display}\n","clickEvent": {{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent": {{"action":"show_text","contents":"{real}"}}}}"#,
-            display = mc_format(&name.display, &['d']),
+            r#"{{text":"  {display}","color":"blue","clickEvent":{{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent":{{"action":"show_text","value":[{{"text":"{real}"}}]}}}}"#,
+            display = name.display,
             real = name.real,
         ));
     }
@@ -44,10 +43,12 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
             //}
             search_results.sort_by(|a, b| a.real.cmp(&b.real));
             let result_string = build_search_results(search_results, 10);
-            tx.send(format!("RCON {} tellraw @a {}", server, result_string)).await.expect("Taurus dead");
+            let cmd = format!("RCON {} tellraw @a {}", server, result_string);
+            println!("{}", cmd);
+            tx.send(cmd).await.expect("Taurus dead");
             return Ok(());
         }
     };
-    tx.send(format!("RCON {} scoreboard objectives setdisplay siderbar {}", server, board)).await.expect("Taurus dead");
+    tx.send(format!("RCON {} scoreboard objectives setdisplay sidebar {}", server, board)).await.expect("Taurus dead");
     Ok(())
 }
