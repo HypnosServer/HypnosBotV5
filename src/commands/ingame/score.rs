@@ -50,13 +50,15 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
                     .await
                     .collect::<Vec<ScoreboardName>>()
                     .await;
-            //if search_results.is_empty() {
-            //    return Ok(());
-            //}
+            if search_results.is_empty() {
+                let text = r#"{{"text":"No search results", "bold": true, "color":"dark_blue"}}"#;
+                let cmd = format!("RCON {} tellraw @a {}", server, text);
+                tx.send(cmd).await.expect("Taurus dead");
+                return Ok(());
+            }
             search_results.sort_by(|a, b| a.real.cmp(&b.real));
             let result_string = build_search_results(search_results, 5);
             let cmd = format!("RCON {} tellraw @a {}", server, result_string);
-            println!("{}", cmd);
             tx.send(cmd).await.expect("Taurus dead");
             return Ok(());
         }
