@@ -95,7 +95,8 @@ fn parse_server(msg: &str) -> Option<(&str, &str)> {
     Some((server, message))
 }
 
-fn ingame_command<'a>(prefixes: &'a Vec<String>, msg: &'a str) -> Option<(&'a str, &'a str, Vec<&'a str>)> {
+fn ingame_command<'a>(prefixes: &'a Vec<String>, msg: &'a WSMessage) -> Option<(&'a str, &'a str, Vec<&'a str>)> {
+    let (_command, msg) = split_incoming_msg(msg)?;
     let (server, msg) = parse_server(msg)?;
     for prefix in prefixes {
         if !msg.starts_with(prefix) {
@@ -162,10 +163,8 @@ pub async fn taurus_connection(
                 match msg {
                     Some(Ok(msg)) => {
                         if is_bridge(&msg) {
-                            if let Some(body) = get_body(&msg) {
-                                if let Some((server, cmd, args)) = ingame_command(&cmd_prefix, body) {
-                                    execute_ingame_command(ctx, server, cmd, &args);
-                                }
+                            if let Some((server, cmd, args)) = ingame_command(&cmd_prefix, &msg) {
+                                execute_ingame_command(ctx, server, cmd, &args);
                             }
                             print_to_discord(&channel, ctx, msg).await;
                         } else {
