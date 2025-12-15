@@ -44,10 +44,10 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
             //}
             search_results.sort_by(|a, b| a.real.cmp(&b.real));
             let result_string = build_search_results(search_results, 10);
-            tx.send(format!("RCON [{}] tellraw @a {}", server, result_string)).await.expect("Taurus dead");
+            tx.send(format!("RCON {} tellraw @a {}", server, result_string)).await.expect("Taurus dead");
             return Ok(());
         }
     };
-    tx.send(format!("RCON [{}] scoreboard objectives setdisplay siderbar {}", server, scoreboard.name)).await.expect("Taurus dead");
+    tx.send(format!("RCON {} scoreboard objectives setdisplay siderbar {}", server, board)).await.expect("Taurus dead");
     Ok(())
 }
