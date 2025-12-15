@@ -19,10 +19,12 @@ fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
     for (i, name) in entries.iter().take(max).enumerate() {
         let last = (i + 1) == entries.len() || (i + 1) == max;
         let display = if last {
-            &name.display
+            name.display.clone()
         } else {
-            &format!("{}\n", name.display)
-        };
+            format!("{}\n", name.display)
+        }
+            .replace("\\", "")
+            .replace("\"", "\\\"");
         components.push(format!(
             r#"{{"text":"  {display}","color":"blue","clickEvent":{{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent":{{"action":"show_text","value":[{{"text":"{real}"}}]}}}}"#,
             real = name.real,
