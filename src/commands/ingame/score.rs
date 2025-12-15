@@ -33,7 +33,8 @@ fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
 }
 
 pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error> {
-    let scoreboard = get_scoreboard(ctx, board).await;
+    let board = board.replace("\\_", "_");
+    let scoreboard = get_scoreboard(ctx, &board).await;
     let tx = {
         let data = ctx.data.read().await;
         let (tx, _rx) = data
@@ -45,7 +46,7 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
         Some(scoreboard) => scoreboard,
         None => {
             let mut search_results =
-                search_scoreboards(ctx, board, SearchFunction::contains(true, true))
+                search_scoreboards(ctx, &board, SearchFunction::contains(true, true))
                     .await
                     .collect::<Vec<ScoreboardName>>()
                     .await;
