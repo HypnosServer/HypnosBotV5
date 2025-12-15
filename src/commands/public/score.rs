@@ -40,9 +40,9 @@ pub(super) async fn get_whitelist<'a>(ctx: Context<'a>) -> HashSet<String> {
     scoreboards.get_whitelist().clone()
 }
 
-pub(super) async fn get_scoreboard<'a>(ctx: Context<'a>, name: &str) -> Option<Scoreboard> {
+pub async fn get_scoreboard<'a>(ctx: &poise::serenity_prelude::Context, name: &str) -> Option<Scoreboard> {
     let should_update = {
-        let data = ctx.serenity_context().data.read().await;
+        let data = ctx.data.read().await;
         let scoreboards = data
             .get::<Scoreboards>()
             .expect("Scoreboards not found in context data");
@@ -53,14 +53,14 @@ pub(super) async fn get_scoreboard<'a>(ctx: Context<'a>, name: &str) -> Option<S
         }
     };
     if should_update {
-        let mut data = ctx.serenity_context().data.write().await;
+        let mut data = ctx.data.write().await;
         let scoreboards = data
             .get_mut::<Scoreboards>()
             .expect("Scoreboards not found in context data");
         scoreboards.load_scoreboard(&name).ok()?;
         scoreboards.load_names().ok()?;
     }
-    let data = ctx.serenity_context().data.read().await;
+    let data = ctx.data.read().await;
     let scoreboards = data
         .get::<Scoreboards>()
         .expect("Scoreboards not found in context data");
@@ -92,7 +92,7 @@ enum SearchFunctions {
     NotCreaturas { threshhold: f64 },
 }
 
-struct SearchFunction {
+pub struct SearchFunction {
     kind: SearchFunctions,
     real: bool,
     display: bool,
@@ -167,12 +167,12 @@ impl SearchFunction {
 }
 
 pub async fn search_scoreboards<'a>(
-    ctx: Context<'a>,
+    ctx: &poise::serenity_prelude::Context,
     partial: &'a str,
     predicate: impl Into<SearchFuncType>,
 ) -> impl Stream<Item = ScoreboardName> + 'a {
     let names = {
-        let data = ctx.serenity_context().data.read().await;
+        let data = ctx.data.read().await;
         let scoreboards = data
             .get::<Scoreboards>()
             .expect("Scoreboards not found in context data");
@@ -188,7 +188,7 @@ pub(super) async fn score_autocomplete_board<'a>(
     ctx: Context<'a>,
     partial: &'a str,
 ) -> impl Stream<Item = String> + 'a {
-    search_scoreboards(ctx, partial, SearchFunction::not_creaturas(true, true, 0.5))
+    search_scoreboards(ctx.serenity_context(), partial, SearchFunction::not_creaturas(true, true, 0.5))
         .await
         .map(|n| n.real)
 }
@@ -231,12 +231,12 @@ pub async fn score(
     board: String,
     whitelist: Option<bool>,
 ) -> Result<(), Error> {
-    let scoreboard = get_scoreboard(ctx.clone(), &board).await;
+    let scoreboard = get_scoreboard(ctx.serenity_context(), &board).await;
     let scoreboard = match scoreboard {
         Some(scoreboard) => scoreboard,
         None => {
             let mut search_results =
-                search_scoreboards(ctx, &board, SearchFunction::contains(true, true))
+                search_scoreboards(ctx.serenity_context(), &board, SearchFunction::contains(true, true))
                     .await
                     .collect::<Vec<ScoreboardName>>()
                     .await;

@@ -61,7 +61,7 @@ pub async fn iscore(
     board: String,
     whitelist: Option<bool>
 ) -> Result<(), Error> {
-    let scoreboard = get_scoreboard(ctx, &board).await;
+    let scoreboard = get_scoreboard(ctx.serenity_context(), &board).await;
     let scoreboard = match scoreboard {
         Some(scoreboard) => scoreboard,
         None => {

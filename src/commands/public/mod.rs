@@ -18,3 +18,4 @@ pub use iscore::iscore;
 pub use tps::tps;
 pub use website::website;
 pub use worldsize::worldsize;
+pub use score::{get_scoreboard, search_scoreboards, SearchFunction};

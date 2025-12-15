@@ -6,7 +6,7 @@ use poise::serenity_prelude::{prelude::TypeMapKey, ChannelId, Context, Message};
 use tokio::{net::TcpStream, sync::mpsc::{Receiver, Sender}};
 use tokio_websockets::{ClientBuilder, MaybeTlsStream, Message as WSMessage, WebSocketStream};
 
-use crate::config::Config;
+use crate::{commands::ingame::execute_ingame_command, config::Config};
 
 pub struct TaurusChannel;
 
@@ -36,6 +36,15 @@ async fn auth_taurus(ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>) -> Res
 fn split_incoming_msg<'a>(msg: &'a WSMessage) -> Option<(&'a str, &'a str)> {
     let split = msg.as_text()?.split_once(" ");
     split
+}
+
+fn get_body<'a>(msg: &'a WSMessage) -> Option<&'a str> {
+    let (command, message) = split_incoming_msg(msg).expect("Failed to split incoming message");
+    if command != "MSG" {
+        return None;
+    }
+    let end_username_index = message.chars().position(|c| c == '>')?;
+    Some(&message[end_username_index+2..])
 }
 
 async fn print_to_discord(channel: &ChannelId, ctx: &Context, msg: WSMessage) {
@@ -74,6 +83,33 @@ async fn connect(uri_str: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStre
     Ok(ws)
 }
 
+fn parse_server(msg: &str) -> Option<(&str, &str)> {
+    let input = msg.strip_prefix('[')?;
+    let (server, rest) = input.split_once(']')?;
+    let rest = rest.trim_start();
+    let rest = rest.strip_prefix('<')?;
+    let (_username, rest) = rest.split_once('>')?;
+
+    let message = rest.trim_start();
+
+    Some((server, message))
+}
+
+fn ingame_command<'a>(prefixes: &'a Vec<String>, msg: &'a str) -> Option<(&'a str, &'a str, Vec<&'a str>)> {
+    let (server, msg) = parse_server(msg)?;
+    for prefix in prefixes {
+        if !msg.starts_with(prefix) {
+            continue;
+        }
+        let len = prefix.len();
+        let mut split = msg[len..].split(" ");
+        let cmd = split.next()?;
+        let args = split.collect();
+        return Some((server, cmd, args));
+    }
+    None
+}
+
 pub async fn taurus_connection(
     ctx: &Context,
     mut rx: Receiver<String>,
@@ -94,6 +130,11 @@ pub async fn taurus_connection(
             .chat_bridge;
 
         ChannelId::new(id)
+    };
+    let cmd_prefix = {
+        let data = ctx.data.read().await;
+        let config = data.get::<Config>().expect("Could not find Config");
+        config.prefix.clone()
     };
     loop {
         tokio::select! {
@@ -121,6 +162,11 @@ pub async fn taurus_connection(
                 match msg {
                     Some(Ok(msg)) => {
                         if is_bridge(&msg) {
+                            if let Some(body) = get_body(&msg) {
+                                if let Some((server, cmd, args)) = ingame_command(&cmd_prefix, body) {
+                                    execute_ingame_command(ctx, server, cmd, &args);
+                                }
+                            }
                             print_to_discord(&channel, ctx, msg).await;
                         } else {
                             let string = msg.as_text().unwrap();
@@ -142,7 +188,7 @@ pub async fn taurus_connection(
     }
 }
 
-fn mc_format(msg: &str, color: &[char]) -> String {
+pub fn mc_format(msg: &str, color: &[char]) -> String {
     let mut formatted = String::new();
     for c in color {
         formatted.push('§');
