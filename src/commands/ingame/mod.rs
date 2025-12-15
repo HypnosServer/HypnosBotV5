@@ -11,7 +11,7 @@ pub async fn execute_ingame_command(ctx: &Context, server: &str, command: &str, 
             let Some(board) = args.get(0) else {
                 return Ok(())
             };
-            score::score(ctx, server, board);
+            score::score(ctx, server, board).await;
         }
         _ => {}
     }

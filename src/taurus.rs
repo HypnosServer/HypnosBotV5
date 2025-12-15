@@ -164,7 +164,7 @@ pub async fn taurus_connection(
                     Some(Ok(msg)) => {
                         if is_bridge(&msg) {
                             if let Some((server, cmd, args)) = ingame_command(&cmd_prefix, &msg) {
-                                execute_ingame_command(ctx, server, cmd, &args);
+                                execute_ingame_command(ctx, server, cmd, &args).await;
                             }
                             print_to_discord(&channel, ctx, msg).await;
                         } else {
