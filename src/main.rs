@@ -1,8 +1,8 @@
+pub mod anvil;
 pub mod commands;
 pub mod config;
 pub mod scoreboard;
 pub mod taurus;
-pub mod anvil;
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -61,7 +61,7 @@ impl EventHandler for Handler {
                 .get::<TaurusChannel>()
                 .expect("TaurusChannel not found");
 
-            send_message(msg, &tx).await;
+            send_message(msg, tx).await;
         }
     }
 
@@ -94,11 +94,9 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv::dotenv().ok();
 
-
     let config_json = read_to_string("config.json").expect("Failed to read config.json");
     let config: ConfigValue =
-    serde_json::from_str(&config_json).expect("Failed to parse config.json");
-
+        serde_json::from_str(&config_json).expect("Failed to parse config.json");
 
     // Login with a bot token from the environment
     let token = env::var("API_TOKEN").expect("Expected a token in the environment");
@@ -152,11 +150,13 @@ async fn main() {
         .await
         .expect("Error creating client");
 
-
     {
-        
         let mut data = client.data.write().await;
-        let scoreboard_path = PathBuf::from(config.get_world_path("SMP").expect("Failed to get world path"));
+        let scoreboard_path = PathBuf::from(
+            config
+                .get_world_path("SMP")
+                .expect("Failed to get world path"),
+        );
         // Insert the chat bridge URL into the data
         data.insert::<Config>(config);
 

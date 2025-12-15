@@ -10,8 +10,14 @@ use poise::serenity_prelude::prelude::TypeMapKey;
 use serde::Deserialize;
 use valence_nbt::{Value, from_binary};
 
+#[derive(Clone)]
+pub struct ScoreboardName {
+    pub real: String,
+    pub display: String,
+}
+
 pub struct ScoreboardNames {
-    pub names: Vec<String>,
+    pub names: Vec<ScoreboardName>,
     last_update: std::time::Instant,
 }
 
@@ -28,7 +34,7 @@ impl ScoreboardNames {
         }
     }
 
-    pub fn update(&mut self, names: Vec<String>) {
+    pub fn update(&mut self, names: Vec<ScoreboardName>) {
         self.names = names;
         self.last_update = std::time::Instant::now();
     }
@@ -118,18 +124,29 @@ impl CachedScoreboard {
             .iter()
             .filter_map(|objective| {
                 if let Value::Compound(compound) = objective.to_value() {
-                    compound.get("Name").and_then(|name| {
+                    let real =  compound.get("Name").and_then(|name| {
                         if let Value::String(name_str) = name {
                             Some(name_str.to_string())
                         } else {
                             None
                         }
-                    })
+                    });
+                    let display =  compound.get("DisplayName").and_then(|name| {
+                        if let Value::String(name_str) = name {
+                            Some(name_str.to_string())
+                        } else {
+                            None
+                        }
+                    });
+                    match (real, display) {
+                        (Some(r), Some(d)) => Some(ScoreboardName { real: r, display: d}),
+                        _ => None
+                    }
                 } else {
                     None
                 }
             })
-            .collect::<Vec<String>>();
+            .collect::<Vec<ScoreboardName>>();
 
 
         let whitelist_string = read_to_string(self.whitelist_path())

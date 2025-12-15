@@ -8,11 +8,17 @@ use std::{
 
 use flate2::bufread::GzDecoder;
 use futures::{Stream, StreamExt, future};
-use poise::serenity_prelude::{collector, CreateButton, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage};
+use poise::serenity_prelude::{
+    CreateButton, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
+    collector,
+};
 use serde::Deserialize;
 use valence_nbt::{Compound, List, Value, from_binary};
 
-use crate::{commands::prelude::*, scoreboard::{Scoreboard, Scoreboards}};
+use crate::{
+    commands::prelude::*,
+    scoreboard::{Scoreboard, ScoreboardName, Scoreboards},
+};
 
 struct Objective {
     name: String,
@@ -80,10 +86,91 @@ fn not_creaturas_furry_search(name: &str, term: &str) -> f64 {
     matches as f64 / name.len() as f64
 }
 
-pub(super) async fn score_autocomplete_board<'a>(
+enum SearchFunctions {
+    StartsWith,
+    Contains,
+    NotCreaturas { threshhold: f64 },
+}
+
+struct SearchFunction {
+    kind: SearchFunctions,
+    real: bool,
+    display: bool,
+}
+
+fn starts_with(name: &str, partial: &str) -> bool {
+    name.starts_with(partial)
+}
+
+fn contains(name: &str, partial: &str) -> bool {
+    name.contains(partial)
+}
+
+type SearchFuncType = Box<dyn Fn(&ScoreboardName, &str) -> bool + Send + Sync>;
+type SearchFuncTypeString = Box<dyn Fn(&str, &str) -> bool + Send + Sync>;
+
+impl Into<SearchFuncTypeString> for SearchFunctions {
+    fn into(self) -> SearchFuncTypeString {
+        match self {
+            SearchFunctions::StartsWith => Box::new(starts_with),
+            SearchFunctions::Contains => Box::new(contains),
+            SearchFunctions::NotCreaturas { threshhold } => {
+                Box::new(move |n, p| not_creaturas_furry_search(n, p) >= threshhold)
+            }
+        }
+    }
+}
+
+impl Into<SearchFuncType> for SearchFunction {
+    fn into(self) -> SearchFuncType {
+        let func: SearchFuncTypeString = self.kind.into();
+        return Box::new(move |n, p| {
+            let real = if self.real {
+                func(&n.real.to_lowercase(), &p.to_lowercase())
+            } else {
+                false
+            };
+            let display = if self.display {
+                func(&n.display.to_lowercase(), &p.to_lowercase())
+            } else {
+                false
+            };
+            real || display
+        });
+    }
+}
+
+impl SearchFunction {
+    pub fn starts_with(real: bool, display: bool) -> Self {
+        Self {
+            kind: SearchFunctions::StartsWith,
+            real,
+            display,
+        }
+    }
+    pub fn contains(real: bool, display: bool) -> Self {
+        Self {
+            kind: SearchFunctions::Contains,
+            real,
+            display,
+        }
+    }
+    pub fn not_creaturas(real: bool, display: bool, threshold: f64) -> Self {
+        Self {
+            kind: SearchFunctions::NotCreaturas {
+                threshhold: threshold,
+            },
+            real,
+            display,
+        }
+    }
+}
+
+pub async fn search_scoreboards<'a>(
     ctx: Context<'a>,
     partial: &'a str,
-) -> impl Stream<Item = String> + 'a {
+    predicate: impl Into<SearchFuncType>,
+) -> impl Stream<Item = ScoreboardName> + 'a {
     let names = {
         let data = ctx.serenity_context().data.read().await;
         let scoreboards = data
@@ -92,13 +179,18 @@ pub(super) async fn score_autocomplete_board<'a>(
         scoreboards.scoreboard_names.names.clone()
     };
 
-    futures::stream::iter(names)
-        .filter(move |name| {
-            let name = name.to_lowercase();
-            let partial = partial.to_lowercase();
-            future::ready(not_creaturas_furry_search(&name, &partial) >= ACCURACY_THRESHOLD)
-        })
-        .map(|name| name.to_string())
+    let predicate = predicate.into();
+
+    futures::stream::iter(names).filter(move |name| future::ready(predicate(name, partial)))
+}
+
+pub(super) async fn score_autocomplete_board<'a>(
+    ctx: Context<'a>,
+    partial: &'a str,
+) -> impl Stream<Item = String> + 'a {
+    search_scoreboards(ctx, partial, SearchFunction::not_creaturas(true, true, 0.5))
+        .await
+        .map(|n| n.real)
 }
 
 pub(super) fn format_with_spaces(n: i64) -> String {
@@ -143,10 +235,35 @@ pub async fn score(
     let scoreboard = match scoreboard {
         Some(scoreboard) => scoreboard,
         None => {
-            ctx.send(
-                CreateReply::default().content(format!("No scoreboard found for `{}`", board)),
-            )
-            .await?;
+            let mut search_results =
+                search_scoreboards(ctx, &board, SearchFunction::contains(true, true))
+                    .await
+                    .collect::<Vec<ScoreboardName>>()
+                    .await;
+            if search_results.is_empty() {
+                ctx.send(
+                    CreateReply::default().content(format!("No scoreboard found for `{}`", board)),
+                )
+                .await?;
+                return Ok(());
+            }
+            search_results.sort_by(|a, b| a.real.cmp(&b.real));
+            let mut embed = embed(&ctx)
+                .await?
+                .title(format!("Search results for {}", board));
+            let mut real = "```\n".to_string();
+            let mut display = "```\n".to_string();
+            for name in search_results.iter().take(10) {
+                real.push_str(&name.real);
+                display.push_str(&name.display);
+            }
+            real.push_str("```");
+            display.push_str("```");
+            embed = embed
+                .field("Internal", real, true)
+                .field("Display", display, true);
+
+            ctx.send(CreateReply::default().embed(embed)).await?;
             return Ok(());
         }
     };
@@ -160,8 +277,7 @@ pub async fn score(
         get_whitelist(ctx).await
     };
 
-    let base_embed = embed(&ctx).await?
-        .title(format!("Scoreboard: {}", board));
+    let base_embed = embed(&ctx).await?.title(format!("Scoreboard: {}", board));
     let base_player_string = String::from("```0 Total\n");
     // Format total as 1 230 000 (1.2M)
     let base_score_string = format!(
@@ -179,25 +295,23 @@ pub async fn score(
         }
         count += 1;
 
-
         player_string.push_str(&format!("{} {}\n", count, player));
         score_string.push_str(&format!("{}\n", format_with_spaces(*score as i64)));
         if count % 10 == 0 {
             player_string.push_str("```");
             score_string.push_str("```");
             embeds.push(
-                base_embed.clone()
+                base_embed
+                    .clone()
                     .field("Player", player_string, true)
                     .field("Score", score_string, true),
             );
             player_string = base_player_string.clone();
             score_string = base_score_string.clone();
         }
-
     }
 
-    paginate(ctx, &embeds)
-        .await?;
+    paginate(ctx, &embeds).await?;
 
     Ok(())
 }
@@ -253,8 +367,7 @@ pub async fn paginate<U, E>(
             .create_response(
                 ctx.serenity_context(),
                 CreateInteractionResponse::UpdateMessage(
-                    CreateInteractionResponseMessage::new()
-                        .embed(pages[current_page].clone())
+                    CreateInteractionResponseMessage::new().embed(pages[current_page].clone()),
                 ),
             )
             .await?;
