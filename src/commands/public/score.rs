@@ -254,8 +254,8 @@ pub async fn score(
             let mut real = "```\n".to_string();
             let mut display = "```\n".to_string();
             for name in search_results.iter().take(10) {
-                real.push_str(&name.real);
-                display.push_str(&name.display);
+                real.push_str(&format!("{}\n", &name.real));
+                display.push_str(&format!("{}\n", &name.display));
             }
             real.push_str("```");
             display.push_str("```");
