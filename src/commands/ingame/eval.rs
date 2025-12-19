@@ -75,7 +75,7 @@ async fn eval_internal(ctx: &Context, username: &str, eval_string: &str) -> Resu
 }
 
 pub async fn eval(ctx: &Context, username: &str, eval_string: &str) -> Result<(), Error> {
-    let result = eval_internal(ctx, username, eval_string).await?;
+    let result = eval_internal(ctx, username, &eval_string.replace("\\_", "_")).await?;
     let message = format!("{}", result);
     let data = ctx.data.read().await;
     let (tx, _rx) = data
