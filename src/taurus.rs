@@ -83,21 +83,28 @@ async fn connect(uri_str: &str) -> Result<WebSocketStream<MaybeTlsStream<TcpStre
     Ok(ws)
 }
 
-fn parse_server(msg: &str) -> Option<(&str, &str)> {
+fn parse_server(msg: &str) -> Option<(&str, &str, &str)> {
     let input = msg.strip_prefix('[')?;
     let (server, rest) = input.split_once(']')?;
     let rest = rest.trim_start();
     let rest = rest.strip_prefix('<')?;
-    let (_username, rest) = rest.split_once('>')?;
+    let (username, rest) = rest.split_once('>')?;
 
     let message = rest.trim_start();
 
-    Some((server, message))
+    Some((server, username, message))
 }
 
-fn ingame_command<'a>(prefixes: &'a Vec<String>, msg: &'a WSMessage) -> Option<(&'a str, &'a str, Vec<&'a str>)> {
+fn ingame_command<'a>(prefixes: &'a Vec<String>, msg: &'a WSMessage) -> Option<(&'a str, &'a str, &'a str, Vec<&'a str>)> {
     let (_command, msg) = split_incoming_msg(msg)?;
-    let (server, msg) = parse_server(msg)?;
+    let (server, username, msg) = parse_server(msg)?;
+    if msg.starts_with('=') {
+        let len = 1;
+        let split = msg[len..].split(" ");
+        let cmd = "eval";
+        let args = split.collect();
+        return Some((server, username, cmd, args));
+    }
     for prefix in prefixes {
         if !msg.starts_with(prefix) {
             continue;
@@ -106,7 +113,7 @@ fn ingame_command<'a>(prefixes: &'a Vec<String>, msg: &'a WSMessage) -> Option<(
         let mut split = msg[len..].split(" ");
         let cmd = split.next()?;
         let args = split.collect();
-        return Some((server, cmd, args));
+        return Some((server, username, cmd, args));
     }
     None
 }
@@ -163,8 +170,8 @@ pub async fn taurus_connection(
                 match msg {
                     Some(Ok(msg)) => {
                         if is_bridge(&msg) {
-                            if let Some((server, cmd, args)) = ingame_command(&cmd_prefix, &msg) {
-                                execute_ingame_command(ctx, server, cmd, &args).await;
+                            if let Some((server, username, cmd, args)) = ingame_command(&cmd_prefix, &msg) {
+                                execute_ingame_command(ctx, server, username, cmd, &args).await;
                             }
                             print_to_discord(&channel, ctx, msg).await;
                         } else {

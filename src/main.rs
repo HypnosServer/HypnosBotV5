@@ -4,7 +4,7 @@ pub mod config;
 pub mod scoreboard;
 pub mod taurus;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::collections::hash_map::Entry;
 use std::env;
 use std::fs::{File, read_to_string};
@@ -22,6 +22,7 @@ use poise::serenity_prelude::prelude::TypeMapKey;
 use poise::serenity_prelude::{
     ChannelId, Client, Command, Context, EventHandler, GatewayIntents, Message, Ready, async_trait,
 };
+use resvg::usvg::roxmltree::Namespace;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -88,6 +89,16 @@ impl EventHandler for Handler {
         });
         println!("INFO: {} is connected!", ready.user.name);
     }
+}
+
+pub struct EvalRepl;
+
+pub struct EvalUser {
+    pub ns: Vec<BTreeMap<String, f64>>,
+}
+
+impl TypeMapKey for EvalRepl {
+    type Value = HashMap<String, EvalUser>;
 }
 
 #[tokio::main]
@@ -162,6 +173,7 @@ async fn main() {
 
         let cached_scoreboard = CachedScoreboard::new(scoreboard_path);
         data.insert::<Scoreboards>(cached_scoreboard);
+        data.insert::<EvalRepl>(HashMap::new());
     }
 
     println!("INFO: Connecting to Discord...");
