@@ -71,7 +71,7 @@ async fn eval_internal(ctx: &Context, username: &str, eval_string: &str) -> Resu
         ns.ns.last_mut().unwrap().insert("_".to_string(), ans);
     }
     ns.ns.last_mut().unwrap().insert(ans_key, ans);
-    Ok(format!("{:.6}", ans))
+    Ok(format!("{}", ans))
 }
 
 pub async fn eval(ctx: &Context, username: &str, eval_string: &str) -> Result<(), Error> {
