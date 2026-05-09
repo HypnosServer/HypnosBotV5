@@ -12,7 +12,7 @@ pub async fn scoreboard_update(ctx: &Context) {
     let mut count = 0;
     loop {
         // Sleep for 1s
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let (tx, _) = ctx.data.read().await.get::<TaurusChannel>().unwrap().clone();
 
         let (player_lists, current) = {
@@ -41,12 +41,12 @@ pub async fn scoreboard_update(ctx: &Context) {
             let Ok(scoreboard) = scoreboards.get_scoreboard(&current) else {
                 continue;
             };
-            let mut removes = Vec::new();
+            let mut removes = 0;
             for player in &smp_players {
                 let Some(score) = scoreboard.get_score(player) else {
                     continue;
                 };
-                removes.push(score);
+                removes += score;
             }
             (smp_players, removes, scoreboard.total)
         };
@@ -54,12 +54,10 @@ pub async fn scoreboard_update(ctx: &Context) {
                 "RCON {} scoreboard players set Total {} {}",
                 "SMP", current, total
         )).await.unwrap();
-        for remove in removes {
-            tx.send(format!(
-                    "RCON {} scoreboard players remove Total {} {}",
-                    "SMP", current, remove
-            )).await.unwrap();
-        }
+        tx.send(format!(
+                "RCON {} scoreboard players remove Total {} {}",
+                "SMP", current, removes
+        )).await.unwrap();
         for add in adds {
             tx.send(format!(
                     "RCON {} scoreboard players operation Total {} += {} {}",
