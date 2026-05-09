@@ -12,7 +12,7 @@ pub async fn scoreboard_update(ctx: &Context) {
     let mut count = 0;
     loop {
         // Sleep for 1s
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         let (tx, _) = ctx.data.read().await.get::<TaurusChannel>().unwrap().clone();
 
         let (player_lists, current) = {
