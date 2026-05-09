@@ -13,6 +13,7 @@ pub use age::age;
 pub use hardware::hardware;
 pub use invite::invite;
 pub use list::list;
+pub use list::send_list;
 pub use score::score;
 pub use iscore::iscore;
 pub use tps::tps;

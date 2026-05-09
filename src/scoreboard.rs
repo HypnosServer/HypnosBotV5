@@ -71,12 +71,20 @@ impl Scoreboard {
     pub fn should_update(&self) -> bool {
         self.last_update.elapsed().as_secs() > 60 // 1 minute
     }
+
+    pub fn get_score(&self, name: &str) -> Option<i64> {
+        self.scores
+            .iter()
+            .find(|(player_name, _)| player_name == name)
+            .map(|(_, score)| *score as i64)
+    }
 }
 
 pub struct CachedScoreboard {
     pub scoreboard_names: ScoreboardNames,
     pub scoreboards: HashMap<String, Scoreboard>,
     pub whitelist: HashSet<String>,
+    pub current: Option<String>,
     path: PathBuf,
 }
 
@@ -85,6 +93,7 @@ impl CachedScoreboard {
         let mut s = Self {
             scoreboard_names: ScoreboardNames::new(),
             scoreboards: HashMap::new(),
+            current: None,
             whitelist: HashSet::new(),
             path,
         };
@@ -233,6 +242,12 @@ impl CachedScoreboard {
 
     pub fn get_whitelist(&self) -> &HashSet<String> {
         &self.whitelist
+    }
+
+    pub fn set(&mut self, s: &str) {
+        if self.scoreboards.contains_key(s) {
+            self.current = Some(s.to_string());
+        }
     }
 }
 

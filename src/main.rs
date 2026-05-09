@@ -3,6 +3,7 @@ pub mod commands;
 pub mod config;
 pub mod scoreboard;
 pub mod taurus;
+pub mod scoreboardupdate;
 
 use std::collections::{BTreeMap, HashMap};
 use std::collections::hash_map::Entry;
@@ -35,8 +36,13 @@ use crate::anvil::run_anvil;
 use crate::commands::{member, public};
 use crate::config::{Config, ConfigValue};
 use crate::scoreboard::{CachedScoreboard, Scoreboards};
+use crate::scoreboardupdate::scoreboard_update;
 use crate::taurus::{TaurusChannel, send_message, taurus_connection};
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct WhitelistName {
+    name: String,
+}
 #[derive(Debug)]
 struct Handler;
 
@@ -81,6 +87,10 @@ impl EventHandler for Handler {
             tokio::spawn(async move {
                 taurus_connection(&taurus_ctx, rx, command_responses).await;
             });
+            let scoreboard_ctx = ctx.clone();
+            tokio::spawn(async move {
+                scoreboard_update(&scoreboard_ctx).await;
+            });
             let anvil_ctx = ctx.clone();
             tokio::spawn(async move {
                 run_anvil(&anvil_ctx).await;
@@ -100,6 +110,13 @@ pub struct EvalUser {
 impl TypeMapKey for EvalRepl {
     type Value = HashMap<String, EvalUser>;
 }
+
+pub struct CurrentIngameBoard;
+
+impl TypeMapKey for CurrentIngameBoard {
+    type Value = Option<String>;
+}
+
 
 #[tokio::main]
 async fn main() {
@@ -174,6 +191,7 @@ async fn main() {
         let cached_scoreboard = CachedScoreboard::new(scoreboard_path);
         data.insert::<Scoreboards>(cached_scoreboard);
         data.insert::<EvalRepl>(HashMap::new());
+        data.insert::<CurrentIngameBoard>(None);
     }
 
     println!("INFO: Connecting to Discord...");

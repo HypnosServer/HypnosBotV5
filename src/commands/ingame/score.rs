@@ -1,10 +1,10 @@
 use crate::{
     commands::{
         prelude::Error,
-        public::{SearchFunction, get_scoreboard, search_scoreboards},
+        public::{get_scoreboard, search_scoreboards, SearchFunction},
     },
     scoreboard::ScoreboardName,
-    taurus::{TaurusChannel, mc_format},
+    taurus::{mc_format, TaurusChannel}, CurrentIngameBoard,
 };
 use futures::{Stream, StreamExt, future};
 use poise::serenity_prelude::Context;
@@ -77,5 +77,10 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
     ))
     .await
     .expect("Taurus dead");
+    let mut data = ctx.data.write().await;
+    let current = data.get_mut::<CurrentIngameBoard>();
+    if let Some(current) = current {
+        *current = Some(board.clone());
+    }
     Ok(())
 }
