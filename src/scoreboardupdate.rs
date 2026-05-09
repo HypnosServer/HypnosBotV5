@@ -24,7 +24,7 @@ pub async fn scoreboard_update(ctx: &Context) {
             let board = board.as_ref().unwrap().clone();
             (send_list(data).await, board)
         };
-        let (adds, removes) = {
+        let (adds, removes, total) = {
             let mut data = ctx.data.write().await;
             let scoreboards = data.get_mut::<Scoreboards>().unwrap();
             let mut smp_players = Vec::new();
@@ -48,8 +48,12 @@ pub async fn scoreboard_update(ctx: &Context) {
                 };
                 removes.push(score);
             }
-            (smp_players, removes)
+            (smp_players, removes, scoreboard.total)
         };
+        tx.send(format!(
+                "RCON {} scoreboard players set Total {} {}",
+                "SMP", current, total
+        )).await.unwrap();
         for remove in removes {
             tx.send(format!(
                     "RCON {} scoreboard players remove Total {} {}",
