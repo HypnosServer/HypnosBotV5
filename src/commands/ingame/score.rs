@@ -71,5 +71,11 @@ pub async fn score(ctx: &Context, server: &str, board: &str) -> Result<(), Error
     ))
     .await
     .expect("Taurus dead");
+    tx.send(format!(
+        "RCON {} scoreboard players set Total {} {}",
+        server, board, scoreboard.total
+    ))
+    .await
+    .expect("Taurus dead");
     Ok(())
 }
