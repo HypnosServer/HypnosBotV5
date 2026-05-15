@@ -84,15 +84,16 @@ impl<'a> Calc<'a> {
     }
 }
 
-pub async fn get_data(ctx: &Context) -> Option<(String, Vec<String>, i64, i64)> {
+pub async fn get_data(ctx: &Context, last: &Option<String>) -> Option<(String, Vec<String>, i64, i64)> {
     let (player_lists, current) = {
         let data = ctx.data.read().await;
         let board = data.get::<CurrentIngameBoard>().unwrap();
         if board.is_none() {
             return None;
         }
+        let same_as_last = board == last;
         let board = board.as_ref().unwrap().clone();
-        if !should_update(ctx, &board).await {
+        if !should_update(ctx, &board).await && !same_as_last {
             return None;
         }
         (send_list(data).await, board)
@@ -127,6 +128,7 @@ pub async fn get_data(ctx: &Context) -> Option<(String, Vec<String>, i64, i64)> 
 
 pub async fn scoreboard_update(ctx: &Context) {
     let mut data = None;
+    let mut last_board = None;
     let (tx, _) = ctx
         .data
         .read()
@@ -137,12 +139,14 @@ pub async fn scoreboard_update(ctx: &Context) {
     let calc = Calc::new(&tx, "SMP").await;
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        if let Some(new_data) = get_data(ctx).await {
+        if let Some(new_data) = get_data(ctx, &last_board).await {
             data = Some(new_data);
         }
         let Some((current, players, removes, total)) = &data else {
             continue;
         };
+
+        last_board = Some(current.to_string());
 
         calc.set(*total).await;
         calc.remove(*removes).await;
