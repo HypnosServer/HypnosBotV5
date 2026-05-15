@@ -17,7 +17,7 @@ use valence_nbt::{Compound, List, Value, from_binary};
 
 use crate::{
     commands::prelude::*,
-    scoreboard::{Scoreboard, ScoreboardName, Scoreboards},
+    scoreboard::{get_scoreboard, Scoreboard, ScoreboardName, Scoreboards},
 };
 
 struct Objective {
@@ -40,32 +40,6 @@ pub(super) async fn get_whitelist<'a>(ctx: Context<'a>) -> HashSet<String> {
     scoreboards.get_whitelist().clone()
 }
 
-pub async fn get_scoreboard<'a>(ctx: &poise::serenity_prelude::Context, name: &str) -> Option<Scoreboard> {
-    let should_update = {
-        let data = ctx.data.read().await;
-        let scoreboards = data
-            .get::<Scoreboards>()
-            .expect("Scoreboards not found in context data");
-        if let Some(scoreboard) = scoreboards.scoreboards.get(name) {
-            scoreboard.should_update()
-        } else {
-            true
-        }
-    };
-    if should_update {
-        let mut data = ctx.data.write().await;
-        let scoreboards = data
-            .get_mut::<Scoreboards>()
-            .expect("Scoreboards not found in context data");
-        scoreboards.load_scoreboard(&name).ok()?;
-        scoreboards.load_names().ok()?;
-    }
-    let data = ctx.data.read().await;
-    let scoreboards = data
-        .get::<Scoreboards>()
-        .expect("Scoreboards not found in context data");
-    scoreboards.scoreboards.get(name).cloned()
-}
 
 const ACCURACY_THRESHOLD: f64 = 0.5;
 

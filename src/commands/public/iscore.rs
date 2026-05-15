@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use poise::serenity_prelude::CreateAttachment;
 use resvg::{tiny_skia, usvg::{self, Tree}};
 
-use super::score::get_scoreboard;
-
-use crate::commands::{prelude::*, public::score::{format_with_spaces, get_whitelist, score_autocomplete_board}};
+use crate::{commands::{prelude::*, public::score::{format_with_spaces, get_whitelist, score_autocomplete_board}}, scoreboard::get_scoreboard};
 
 
 

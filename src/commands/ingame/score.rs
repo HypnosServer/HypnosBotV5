@@ -1,9 +1,9 @@
 use crate::{
     commands::{
         prelude::Error,
-        public::{get_scoreboard, search_scoreboards, SearchFunction},
+        public::{search_scoreboards, SearchFunction},
     },
-    scoreboard::ScoreboardName,
+    scoreboard::{get_scoreboard, ScoreboardName},
     taurus::{mc_format, TaurusChannel}, CurrentIngameBoard,
 };
 use futures::{Stream, StreamExt, future};

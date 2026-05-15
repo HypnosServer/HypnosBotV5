@@ -1,6 +1,6 @@
 use poise::serenity_prelude::Context;
 
-use crate::scoreboard::Scoreboards;
+use crate::scoreboard::{get_scoreboard, Scoreboards};
 use crate::taurus::TaurusChannel;
 use crate::CurrentIngameBoard;
 
@@ -25,8 +25,6 @@ pub async fn scoreboard_update(ctx: &Context) {
             (send_list(data).await, board)
         };
         let (adds, removes, total) = {
-            let mut data = ctx.data.write().await;
-            let scoreboards = data.get_mut::<Scoreboards>().unwrap();
             let mut smp_players = Vec::new();
             for line in player_lists {
                 if !line.contains("SMP") {
@@ -34,11 +32,12 @@ pub async fn scoreboard_update(ctx: &Context) {
                 }
                 let players = line.split(": ").last().unwrap();
                 for player in players.split(", ") {
-                    smp_players.push(player.to_string());
+                    if !player.is_empty() {
+                        smp_players.push(player.to_string());
+                    }
                 }
             }
-            smp_players = smp_players.into_iter().filter(|p| !p.is_empty()).collect();
-            let Ok(scoreboard) = scoreboards.get_scoreboard(&current) else {
+            let Some(scoreboard) = get_scoreboard(&ctx, &current).await else {
                 continue;
             };
             let mut removes = 0;

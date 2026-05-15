@@ -10,6 +10,33 @@ use poise::serenity_prelude::prelude::TypeMapKey;
 use serde::Deserialize;
 use valence_nbt::{Value, from_binary};
 
+pub async fn get_scoreboard<'a>(ctx: &poise::serenity_prelude::Context, name: &str) -> Option<Scoreboard> {
+    let should_update = {
+        let data = ctx.data.read().await;
+        let scoreboards = data
+            .get::<Scoreboards>()
+            .expect("Scoreboards not found in context data");
+        if let Some(scoreboard) = scoreboards.scoreboards.get(name) {
+            scoreboard.should_update()
+        } else {
+            true
+        }
+    };
+    if should_update {
+        let mut data = ctx.data.write().await;
+        let scoreboards = data
+            .get_mut::<Scoreboards>()
+            .expect("Scoreboards not found in context data");
+        scoreboards.load_scoreboard(&name).ok()?;
+        scoreboards.load_names().ok()?;
+    }
+    let data = ctx.data.read().await;
+    let scoreboards = data
+        .get::<Scoreboards>()
+        .expect("Scoreboards not found in context data");
+    scoreboards.scoreboards.get(name).cloned()
+}
+
 #[derive(Clone)]
 pub struct ScoreboardName {
     pub real: String,
@@ -231,7 +258,7 @@ impl CachedScoreboard {
         Ok(())
     }
 
-    pub fn get_scoreboard(&mut self, name: &str) -> Result<&Scoreboard, String> {
+    fn get_scoreboard(&mut self, name: &str) -> Result<&Scoreboard, String> {
         if self.scoreboards.get(name).is_none() {
             self.load_scoreboard(name)?;
         }
