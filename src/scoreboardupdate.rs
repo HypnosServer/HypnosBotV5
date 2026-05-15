@@ -134,9 +134,9 @@ pub async fn scoreboard_update(ctx: &Context) {
     let calc = Calc::new(&tx, "SMP").await;
     let mut i = 0;
     loop {
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         i += 1;
-        if i % 10 == 0 {
+        if i % 60 == 0 {
             data = get_data(ctx).await;
             i = 0;
         }
