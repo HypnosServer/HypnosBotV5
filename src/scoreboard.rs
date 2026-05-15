@@ -1,6 +1,6 @@
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fs::{read_to_string, File},
+    collections::{HashMap, HashSet, hash_map::Entry},
+    fs::{File, read_to_string},
     io::{BufReader, Read},
     path::PathBuf,
 };
@@ -10,7 +10,22 @@ use poise::serenity_prelude::prelude::TypeMapKey;
 use serde::Deserialize;
 use valence_nbt::{Value, from_binary};
 
-pub async fn get_scoreboard<'a>(ctx: &poise::serenity_prelude::Context, name: &str) -> Option<Scoreboard> {
+pub async fn should_update(ctx: &poise::serenity_prelude::Context, name: &str) -> bool {
+    let data = ctx.data.read().await;
+    let scoreboards = data
+        .get::<Scoreboards>()
+        .expect("Scoreboards not found in context data");
+    if let Some(scoreboard) = scoreboards.scoreboards.get(name) {
+        scoreboard.should_update()
+    } else {
+        true
+    }
+}
+
+pub async fn get_scoreboard<'a>(
+    ctx: &poise::serenity_prelude::Context,
+    name: &str,
+) -> Option<Scoreboard> {
     let should_update = {
         let data = ctx.data.read().await;
         let scoreboards = data
@@ -141,8 +156,8 @@ impl CachedScoreboard {
     }
 
     pub fn load_names(&mut self) -> Result<(), String> {
-        let mut file =
-            File::open(&self.path()).map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
+        let mut file = File::open(&self.path())
+            .map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
         let mut buf = Vec::new();
         let mut d = GzDecoder::new(BufReader::new(&mut file));
         d.read_to_end(&mut buf)
@@ -160,14 +175,14 @@ impl CachedScoreboard {
             .iter()
             .filter_map(|objective| {
                 if let Value::Compound(compound) = objective.to_value() {
-                    let real =  compound.get("Name").and_then(|name| {
+                    let real = compound.get("Name").and_then(|name| {
                         if let Value::String(name_str) = name {
                             Some(name_str.to_string())
                         } else {
                             None
                         }
                     });
-                    let display =  compound.get("DisplayName").and_then(|name| {
+                    let display = compound.get("DisplayName").and_then(|name| {
                         if let Value::String(name_str) = name {
                             Some(name_str.to_string())
                         } else {
@@ -175,15 +190,17 @@ impl CachedScoreboard {
                         }
                     });
                     match (real, display) {
-                        (Some(r), Some(d)) => Some(ScoreboardName { real: r, display: d}),
-                        _ => None
+                        (Some(r), Some(d)) => Some(ScoreboardName {
+                            real: r,
+                            display: d,
+                        }),
+                        _ => None,
                     }
                 } else {
                     None
                 }
             })
             .collect::<Vec<ScoreboardName>>();
-
 
         let whitelist_string = read_to_string(self.whitelist_path())
             .map_err(|e| format!("Failed to read whitelist file: {}", e))?;
@@ -203,8 +220,8 @@ impl CachedScoreboard {
     }
 
     pub fn load_scoreboard(&mut self, name: &str) -> Result<(), String> {
-        let mut file =
-            File::open(&self.path()).map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
+        let mut file = File::open(&self.path())
+            .map_err(|e| format!("Failed to open scoreboard file: {}", e))?;
         let mut buf = Vec::new();
         let mut d = GzDecoder::new(BufReader::new(&mut file));
         d.read_to_end(&mut buf)

@@ -2,7 +2,7 @@ use poise::serenity_prelude::Context;
 use tokio::sync::mpsc::Sender;
 
 use crate::CurrentIngameBoard;
-use crate::scoreboard::{Scoreboards, get_scoreboard};
+use crate::scoreboard::{Scoreboards, get_scoreboard, should_update};
 use crate::taurus::TaurusChannel;
 
 use crate::commands::public::send_list;
@@ -92,6 +92,9 @@ pub async fn get_data(ctx: &Context) -> Option<(String, Vec<String>, i64, i64)> 
             return None;
         }
         let board = board.as_ref().unwrap().clone();
+        if !should_update(ctx, &board).await {
+            return None;
+        }
         (send_list(data).await, board)
     };
     let (players, removes, total) = {
@@ -132,13 +135,10 @@ pub async fn scoreboard_update(ctx: &Context) {
         .unwrap()
         .clone();
     let calc = Calc::new(&tx, "SMP").await;
-    let mut i = 0;
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        i += 1;
-        if i % 60 == 0 {
-            data = get_data(ctx).await;
-            i = 0;
+        if let Some(new_data) = get_data(ctx).await {
+            data = Some(new_data);
         }
         let Some((current, players, removes, total)) = &data else {
             continue;
