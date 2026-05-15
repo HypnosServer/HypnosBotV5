@@ -1,13 +1,16 @@
 use crate::{
+    CurrentIngameBoard,
     commands::{
         prelude::Error,
-        public::{search_scoreboards, SearchFunction},
+        public::{SearchFunction, search_scoreboards},
     },
-    scoreboard::{get_scoreboard, ScoreboardName},
-    taurus::{mc_format, TaurusChannel}, CurrentIngameBoard,
+    scoreboard::{ScoreboardName, get_scoreboard},
+    taurus::{TaurusChannel, mc_format},
 };
 use futures::{Stream, StreamExt, future};
 use poise::serenity_prelude::Context;
+use tokio::sync::mpsc::Sender;
+
 
 fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
     let mut components = Vec::new();
@@ -23,8 +26,8 @@ fn build_search_results(entries: Vec<ScoreboardName>, max: usize) -> String {
         } else {
             format!("{}\n", name.display)
         }
-            .replace("\\", "")
-            .replace("\"", "\\\"");
+        .replace("\\", "")
+        .replace("\"", "\\\"");
         components.push(format!(
             r#"{{"text":"  {display}","color":"blue","clickEvent":{{"action":"suggest_command","value":"/scoreboardPublic objectives setdisplay sidebar {real}"}},"hoverEvent":{{"action":"show_text","value":[{{"text":"{real}"}}]}}}}"#,
             real = name.real,

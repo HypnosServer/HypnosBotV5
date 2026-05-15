@@ -1,19 +1,96 @@
 use poise::serenity_prelude::Context;
+use tokio::sync::mpsc::Sender;
 
-use crate::scoreboard::{get_scoreboard, Scoreboards};
-use crate::taurus::TaurusChannel;
 use crate::CurrentIngameBoard;
+use crate::scoreboard::{Scoreboards, get_scoreboard};
+use crate::taurus::TaurusChannel;
 
 use crate::commands::public::send_list;
 
+struct Calc<'a> {
+    tx: &'a Sender<String>,
+    server: &'a str,
+}
 
+impl<'a> Calc<'a> {
+    pub async fn new(tx: &'a Sender<String>, server: &'a str) -> Self {
+        tx.send(format!(
+            "RCON {} scoreboard objectives add calc dummy",
+            server,
+        ))
+        .await
+        .expect("Taurus dead");
+        return Self { tx, server };
+    }
+
+    pub async fn add_player(&self, player: &str, board: &str) {
+        self.tx.send(format!(
+            "RCON {} scoreboard players operation val calc += {} {}",
+            self.server, player, board
+        ))
+        .await
+        .unwrap();
+    }
+
+    pub async fn add(&self, val: i64) {
+        self.tx.send(format!(
+            "RCON {} scoreboard players add val calc {}",
+            self.server, val
+        ))
+        .await
+        .unwrap();
+    }
+
+    pub async fn remove_player(&self, player: &str, board: &str) {
+        self.tx.send(format!(
+            "RCON {} scoreboard players operation val calc -= {} {}",
+            self.server, player, board
+        ))
+        .await
+        .unwrap();
+    }
+
+    pub async fn remove(&self, val: i64) {
+        self.tx.send(format!(
+            "RCON {} scoreboard players remove val calc {}",
+            self.server, val
+        ))
+        .await
+        .unwrap();
+    }
+
+    pub async fn set(&self, val: i64) {
+        self.tx.send(format!(
+            "RCON {} scoreboard players set val calc {}",
+            self.server, val
+        ))
+        .await
+        .unwrap();
+
+    }
+
+    pub async fn set_other_total(&self, board: &str) {
+        self.tx.send(format!(
+            "RCON {} scoreboard players operation Total {} = val calc",
+            self.server, board
+        ))
+        .await
+        .unwrap();
+    }
+}
 
 pub async fn scoreboard_update(ctx: &Context) {
     let mut count = 0;
     loop {
         // Sleep for 1s
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-        let (tx, _) = ctx.data.read().await.get::<TaurusChannel>().unwrap().clone();
+        let (tx, _) = ctx
+            .data
+            .read()
+            .await
+            .get::<TaurusChannel>()
+            .unwrap()
+            .clone();
 
         let (player_lists, current) = {
             let data = ctx.data.read().await;
@@ -49,20 +126,12 @@ pub async fn scoreboard_update(ctx: &Context) {
             }
             (smp_players, removes, scoreboard.total)
         };
-        tx.send(format!(
-                "RCON {} scoreboard players set Total {} {}",
-                "SMP", current, total
-        )).await.unwrap();
-        tx.send(format!(
-                "RCON {} scoreboard players remove Total {} {}",
-                "SMP", current, removes
-        )).await.unwrap();
+        let calc = Calc::new(&tx, "SMP").await;
+        calc.set(total).await;
+        calc.remove(removes).await;
         for add in adds {
-            tx.send(format!(
-                    "RCON {} scoreboard players operation Total {} += {} {}",
-                    "SMP", current, add, current
-            )).await.unwrap();
+            calc.add_player(&add, &current).await;
         }
+        calc.set_other_total(&current).await;
     }
-
 }
