@@ -93,7 +93,7 @@ pub async fn get_data(ctx: &Context, last: &Option<String>) -> Option<(String, V
         }
         let same_as_last = board == last;
         let board = board.as_ref().unwrap().clone();
-        if !should_update(ctx, &board).await && !same_as_last {
+        if !should_update(ctx, &board).await && same_as_last {
             return None;
         }
         (send_list(data).await, board)
