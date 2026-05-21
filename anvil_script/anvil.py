@@ -1,4 +1,5 @@
 import sys
+import requests
 
 def get_block(dim, x, y, z) -> tuple:
     print(f"GET {dim} {x} {y} {z}")
@@ -45,6 +46,16 @@ def eps_storage():
 
     print(f"PRINT EPS Storage | Gunpowder: {gp_10}{gp_1}.{gp_dec}M ({gp_percent_10}{gp_percent_1}%), Bones: {bone_10}{bone_1}.{bone_dec}M ({bone_percent_10}{bone_percent_1}%)")
 
+def leaderboard():
+    r = requests.get("http://localhost:11002/api/weekly?objectives=dugged,u.diamond_shovel")
+    js = r.json()
+    string = "PRINT Weekly Dig Leaderboard | "
+    for stat in js:
+        player = stat['player']
+        gain = stat ['gain']
+        string += f"{player}: {gain}\n"
+    print(string)
+
 
 
 
@@ -52,3 +63,4 @@ def eps_storage():
 ow_mobswitch()
 nether_mobswitch()
 eps_storage()
+leaderboard()
