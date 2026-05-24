@@ -191,6 +191,7 @@ pub async fn run_anvil(
             for print in prints {
                 let split = print.split_once('|').unwrap_or((&print, ""));
                 let (title, content) = split;
+                let content = content.replace("\\n", "\n");
                 embed = embed.field(title.trim(), content.trim(), false);
             }
 

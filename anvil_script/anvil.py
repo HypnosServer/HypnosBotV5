@@ -53,7 +53,7 @@ def leaderboard():
     for stat in js:
         player = stat['player']
         gain = stat ['gain']
-        string += f"{player}: {gain}\n"
+        string += f"{player}: {gain}\\n"
     print(string)
 
 
