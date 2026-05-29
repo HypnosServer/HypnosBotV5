@@ -154,10 +154,9 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
                     if let Err(e) = stdin.write_all(response.as_bytes()) {
                     }
                     continue;
-                } else {
-                    *perim_call_count = 0;
                 }
                 *perim_call_count += 1;
+                *perim_call_count %= 0;
                 if parts.len() != 5 {
                     continue;
                 }
