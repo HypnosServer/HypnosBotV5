@@ -225,9 +225,9 @@ pub async fn run_anvil(
             .expect("World path not found for SMP");
         (channel, PathBuf::from(world_path))
     };
-    let mut world = World::new(world_path);
     let mut cache: HashMap<String, u32> = HashMap::new();
     loop {
+        let mut world = World::new(world_path.clone());
         let instant = std::time::Instant::now();
         {
             let prints = run_loop(&mut world, &mut cache);
