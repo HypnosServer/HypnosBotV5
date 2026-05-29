@@ -149,8 +149,8 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
                 let perim_call_count = cache.entry("perim_call_count".to_string()).or_insert(0);
                 *perim_call_count += 1;
                 if *perim_call_count % 10 != 1 {
-                    let block_count = cache.get("block_count").cloned().unwrap_or(0);
-                    let air_count = cache.get("air_count").cloned().unwrap_or(0);
+                    let block_count = *cache.entry("block_count".to_string()).or_insert(0);
+                    let air_count = *cache.entry("air_count".to_string()).or_insert(0);
                     let response = format!("{} {}\n", block_count, air_count);
                     if let Err(e) = stdin.write_all(response.as_bytes()) {
                     }
