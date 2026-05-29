@@ -28,7 +28,7 @@ impl<'a> Map<'a> {
     }
 }
 
-fn get_block_ic(x: i64, y: i64, z: i64, chunk: Compound) -> Option<(u8, u8)> {
+fn get_block_ic(x: i64, y: i64, z: i64, chunk: &Compound) -> Option<(u8, u8)> {
     let Some(Value::Compound(chunk_data)) = chunk.get("Level") else {
         return None;
     };
@@ -73,7 +73,7 @@ fn get_block_ic(x: i64, y: i64, z: i64, chunk: Compound) -> Option<(u8, u8)> {
 fn get_block(x: i64, y: i64, z: i64, region: &mut Map) -> u8 {
     let chunk = region.get_chunk(x.div_euclid(16) as i32, z.div_euclid(16) as i32);
     if let Some(chunk) = chunk {
-        if let Some((block_id, data)) = get_block_ic(x, y, z, chunk) {
+        if let Some((block_id, data)) = get_block_ic(x, y, z, &chunk) {
             return block_id;
         }
     }
@@ -186,11 +186,13 @@ fn flood_fill_outside(map: &mut Vec<bool>, width: usize, height: usize, start_x:
     }
 }
 
-fn count_air(x: i64, y_range: (i64, i64), z: i64, region: &mut Map) -> u32 {
+fn count_air(x: i64, y_range: (i64, i64), z: i64, chunk: &Compound) -> u32 {
     let mut count = 0;
     for y in y_range.0..=y_range.1 {
-        if get_block(x, y, z, region) == 0 {
-            count += 1;
+        if let Some((block_id, data)) = get_block_ic(x, y, z, chunk) {
+            if block_id == 0 {
+                count += 1;
+            }
         }
     }
     count
@@ -244,17 +246,44 @@ pub fn perimeter_count(region_folder: &mut RegionFolder, start_pos: (i64, i64, i
     let mut grid = Grid::new(min_x, max_x, min_z, max_z);
     grid.data = flood_shape;
     grid.flood_fill(start_pos.0, start_pos.2);
+    let true_count = grid.data.iter().filter(|b| **b).count();
+    println!("True count: {}", true_count);
     let mut block_count = 0;
     let mut air_count = 0;
     let y_range = (5, 63);
-    for z in min_z..=max_z {
-        for x in min_x..=max_x {
-            if grid.data[((z - min_z) * (max_x - min_x + 1) + (x - min_x)) as usize] {
-                block_count += (y_range.1 - y_range.0 + 1) as u32;
-                air_count += count_air(x, y_range, z, &mut map);
+    // Map with c
+    let min_z_chunk = min_z.div_euclid(16);
+    let max_z_chunk = max_z.div_euclid(16);
+    let min_x_chunk = min_x.div_euclid(16);
+    let max_x_chunk = max_x.div_euclid(16);
+    for z_chunk in min_z_chunk..=max_z_chunk {
+        for x_chunk in min_x_chunk..=max_x_chunk {
+            let chunk = map.get_chunk(x_chunk as i32, z_chunk as i32);
+            if let Some(chunk) = chunk {
+                for z in (z_chunk * 16)..((z_chunk + 1) * 16) {
+                    for x in (x_chunk * 16)..((x_chunk + 1) * 16) {
+                        if z < min_z || z > max_z || x < min_x || x > max_x {
+                            continue;
+                        }
+                        let index = ((z - min_z) * (max_x - min_x + 1) + (x - min_x)) as usize;
+                        if grid.data[index] {
+                            block_count += (y_range.1 - y_range.0 + 1) as u32;
+                            air_count += count_air(x, y_range, z, &chunk);
+                        }
+                    }
+                }
             }
         }
     }
+    //for z in min_z..=max_z {
+    //    for x in min_x..=max_x {
+    //        if grid.data[((z - min_z) * (max_x - min_x + 1) + (x - min_x)) as usize] {
+    //            block_count += (y_range.1 - y_range.0 + 1) as u32;
+    //            air_count += count_air(x, y_range, z, &mut map);
+    //        }
+    //    }
+    //}
+    println!("Block count: {}, Air count: {}", block_count, air_count);
     return (block_count, air_count);
 }
 
