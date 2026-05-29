@@ -156,7 +156,7 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
                     continue;
                 }
                 *perim_call_count += 1;
-                *perim_call_count %= 0;
+                *perim_call_count %= 10;
                 if parts.len() != 5 {
                     continue;
                 }
