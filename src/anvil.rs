@@ -1,4 +1,4 @@
-use std::{io::{BufRead, Read, Write}, path::PathBuf, process::Command, sync::Arc};
+use std::{collections::HashMap, io::{BufRead, Read, Write}, path::PathBuf, process::Command, sync::Arc};
 
 use poise::serenity_prelude::{ChannelId, Context, CreateEmbedFooter, CreateMessage, EditMessage, GuildId, Http, Message, MessageId};
 use tokio::time::sleep;
@@ -64,7 +64,7 @@ impl World {
     }
 }
 
-fn run_loop(world: &mut World) -> Vec<String> {
+fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> {
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
@@ -80,8 +80,6 @@ fn run_loop(world: &mut World) -> Vec<String> {
 
     // while child is running
     let mut prints = Vec::new();
-    let mut perim_cache = (0, 0);
-    let mut perim_call_count = 0;
     loop {
         // Read a line from stdin
         if let Ok(Some(status)) = child_process.try_wait() {
@@ -148,15 +146,18 @@ fn run_loop(world: &mut World) -> Vec<String> {
                 }
             }
             "PERIM" => {
-                if perim_call_count % 10 != 0 {
-                    let response = format!("{} {}\n", perim_cache.0, perim_cache.1);
+                let perim_call_count = cache.entry("perim_call_count".to_string()).or_insert(0);
+                if *perim_call_count % 10 != 0 {
+                    let block_count = cache.get("block_count").cloned().unwrap_or(0);
+                    let air_count = cache.get("air_count").cloned().unwrap_or(0);
+                    let response = format!("{} {}\n", block_count, air_count);
                     if let Err(e) = stdin.write_all(response.as_bytes()) {
                     }
                     continue;
                 } else {
-                    perim_call_count = 0;
+                    *perim_call_count = 0;
                 }
-                perim_call_count += 1;
+                *perim_call_count += 1;
                 if parts.len() != 5 {
                     continue;
                 }
@@ -187,8 +188,10 @@ fn run_loop(world: &mut World) -> Vec<String> {
                         continue;
                     }
                 };
-                perim_cache = perimeter_count(region, (x, y, z));
-                let response = format!("{} {}\n", perim_cache.0, perim_cache.1);
+                let (b, a) = perimeter_count(region, (x, y, z));
+                cache.insert("block_count".to_string(), b);
+                cache.insert("air_count".to_string(), a);
+                let response = format!("{} {}\n", b, a);
                 if let Err(e) = stdin.write_all(response.as_bytes()) {
                 }
             }
@@ -224,10 +227,11 @@ pub async fn run_anvil(
         (channel, PathBuf::from(world_path))
     };
     let mut world = World::new(world_path);
+    let mut cache: HashMap<String, u32> = HashMap::new();
     loop {
         let instant = std::time::Instant::now();
         {
-            let prints = run_loop(&mut world);
+            let prints = run_loop(&mut world, &mut cache);
             let duration_since_epoch = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or(std::time::Duration::new(0, 0))
