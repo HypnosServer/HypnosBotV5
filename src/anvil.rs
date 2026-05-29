@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use valence_anvil::RegionFolder;
 use valence_nbt::{Compound, Value};
 
-use crate::config::Config;
+use crate::{config::Config, flood::perimeter_count};
 
 struct World {
     ow: RegionFolder,
@@ -80,6 +80,8 @@ fn run_loop(world: &mut World) -> Vec<String> {
 
     // while child is running
     let mut prints = Vec::new();
+    let mut perim_cache = (0, 0);
+    let mut perim_call_count = 0;
     loop {
         // Read a line from stdin
         if let Ok(Some(status)) = child_process.try_wait() {
@@ -143,6 +145,51 @@ fn run_loop(world: &mut World) -> Vec<String> {
                         if let Err(e) = stdin.write_all(response.as_bytes()) {
                         }
                     }
+                }
+            }
+            "PERIM" => {
+                if perim_call_count % 10 != 0 {
+                    let response = format!("{} {}\n", perim_cache.0, perim_cache.1);
+                    if let Err(e) = stdin.write_all(response.as_bytes()) {
+                    }
+                    continue;
+                } else {
+                    perim_call_count = 0;
+                }
+                perim_call_count += 1;
+                if parts.len() != 5 {
+                    continue;
+                }
+                let dim: &str = parts[1];
+                let x: i64 = match parts[2].parse() {
+                    Ok(val) => val,
+                    Err(_) => {
+                        continue;
+                    }
+                };
+                let y: i64 = match parts[3].parse() {
+                    Ok(val) => val,
+                    Err(_) => {
+                        continue;
+                    }
+                };
+                let z: i64 = match parts[4].parse() {
+                    Ok(val) => val,
+                    Err(_) => {
+                        continue;
+                    }
+                };
+                let region = match dim {
+                    "overworld" => &mut world.ow,
+                    "nether" => &mut world.nether,
+                    "end" => &mut world.end,
+                    _ => {
+                        continue;
+                    }
+                };
+                perim_cache = perimeter_count(region, (x, y, z));
+                let response = format!("{} {}\n", perim_cache.0, perim_cache.1);
+                if let Err(e) = stdin.write_all(response.as_bytes()) {
                 }
             }
             "PRINT" => {
