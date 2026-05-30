@@ -20,9 +20,11 @@ impl<'a> Map<'a> {
         if let Some(chunk) = self.cached_chunks.get(&(x, z)) {
             return Some(chunk.clone());
         }
-        if let Ok(Some(chunk)) = self.region.get_chunk(x, z) {
-            self.cached_chunks.insert((x, z), chunk.data.clone());
-            return Some(chunk.data);
+        for _ in 0..3 {
+            if let Ok(Some(chunk)) = self.region.get_chunk(x, z) {
+                self.cached_chunks.insert((x, z), chunk.data.clone());
+                return Some(chunk.data);
+            }
         }
         None
     }
@@ -66,9 +68,7 @@ fn get_block_ic(x: i64, y: i64, z: i64, chunk: &Compound) -> Option<(u8, u8)> {
         data.get(data_index as usize)? >> 4 & 0x0F
     };
     Some((*block_id as u8, data_value as u8))
-
 }
-
 
 fn get_block(x: i64, y: i64, z: i64, region: &mut Map) -> u8 {
     let chunk = region.get_chunk(x.div_euclid(16) as i32, z.div_euclid(16) as i32);
@@ -134,18 +134,28 @@ impl Grid {
     }
 
     fn flood_fill(&mut self, start_x: i64, start_z: i64) {
-        let mut expanded = expand_by_one(&self.data.clone(), (self.max_x - self.min_x + 1) as usize, (self.max_z - self.min_z + 1) as usize);
-        flood_fill_outside(&mut expanded, (self.max_x - self.min_x + 3) as usize, (self.max_z - self.min_z + 3) as usize, 0, 0);
+        let mut expanded = expand_by_one(
+            &self.data.clone(),
+            (self.max_x - self.min_x + 1) as usize,
+            (self.max_z - self.min_z + 1) as usize,
+        );
+        flood_fill_outside(
+            &mut expanded,
+            (self.max_x - self.min_x + 3) as usize,
+            (self.max_z - self.min_z + 3) as usize,
+            0,
+            0,
+        );
         for z in self.min_z..=self.max_z {
             for x in self.min_x..=self.max_x {
-                let expanded_index = ((z - self.min_z + 1) * (self.max_x - self.min_x + 3) + (x - self.min_x + 1))
-                    as usize;
-                let index = ((z - self.min_z) * (self.max_x - self.min_x + 1) + (x - self.min_x)) as usize;
+                let expanded_index = ((z - self.min_z + 1) * (self.max_x - self.min_x + 3)
+                    + (x - self.min_x + 1)) as usize;
+                let index =
+                    ((z - self.min_z) * (self.max_x - self.min_x + 1) + (x - self.min_x)) as usize;
                 self.data[index] = !expanded[expanded_index];
             }
         }
     }
-
 }
 
 fn expand_by_one(map: &Vec<bool>, width: usize, height: usize) -> Vec<bool> {
@@ -162,7 +172,13 @@ fn expand_by_one(map: &Vec<bool>, width: usize, height: usize) -> Vec<bool> {
     expanded
 }
 
-fn flood_fill_outside(map: &mut Vec<bool>, width: usize, height: usize, start_x: usize, start_y: usize) {
+fn flood_fill_outside(
+    map: &mut Vec<bool>,
+    width: usize,
+    height: usize,
+    start_x: usize,
+    start_y: usize,
+) {
     let mut queue = VecDeque::new();
     queue.push_back((start_x, start_y));
     while let Some((x, y)) = queue.pop_front() {
@@ -228,11 +244,9 @@ pub fn perimeter_count(region_folder: &mut RegionFolder, start_pos: (i64, i64, i
     }
     let vec = shape.clone().into_iter().collect::<Vec<_>>();
     let min_x = vec.iter().map(|(x, _, _)| *x).min().unwrap();
-    let max_x = vec.iter().map(|(x, _, _)| *x).
-        max().unwrap();
+    let max_x = vec.iter().map(|(x, _, _)| *x).max().unwrap();
     let min_z = vec.iter().map(|(_, _, z)| *z).min().unwrap();
-    let max_z = vec.iter().map(|(_, _, z)| *z).max().
-        unwrap();
+    let max_z = vec.iter().map(|(_, _, z)| *z).max().unwrap();
     let mut flood_shape = Vec::new();
     for z in min_z..=max_z {
         for x in min_x..=max_x {
@@ -286,4 +300,3 @@ pub fn perimeter_count(region_folder: &mut RegionFolder, start_pos: (i64, i64, i
     println!("Block count: {}, Air count: {}", block_count, air_count);
     return (block_count, air_count);
 }
-
