@@ -14,7 +14,7 @@ def get_perim(dim, x, y, z) -> tuple:
     print(f"PERIM {dim} {x} {y} {z}")
     stats = input()
     try:
-        block_cnt, air_cnt = metadata.split()
+        block_cnt, air_cnt = stats.split()
     except e:
         sys.exit(1)
     return int(block_cnt), int(air_cnt)
