@@ -11,6 +11,7 @@ struct World {
     ow: RegionFolder,
     nether: RegionFolder,
     end: RegionFolder,
+    world_path: PathBuf,
 }
 
 fn get_block(x: i64, y: i64, z: i64, chunk: Compound) -> Option<(u8, u8)> {
@@ -60,11 +61,22 @@ impl World {
         let nether = RegionFolder::new(world_path.join("DIM-1/region"));
         let end = RegionFolder::new(world_path.join("DIM1/region"));
 
-        World { ow, nether, end }
+        World { ow, nether, end, world_path }
+    }
+
+    fn new_ow(&self) -> RegionFolder {
+        return RegionFolder::new(self.world_path.join("region"));
+    }
+    fn new_nether(&self) -> RegionFolder {
+        return RegionFolder::new(self.world_path.join("DIM-1/region"));
+    }
+    fn new_end(&self) -> RegionFolder {
+        return RegionFolder::new(self.world_path.join("DIM1/region"));
     }
 }
 
-async fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> {
+async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<String> {
+    let mut world = World::new(world_path);
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
@@ -178,15 +190,19 @@ async fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<St
                         continue;
                     }
                 };
-                let region = match dim {
-                    "overworld" => &mut world.ow,
-                    "nether" => &mut world.nether,
-                    "end" => &mut world.end,
+                let mut region = match dim {
+                    "overworld" => world.new_ow(),
+                    "nether" => world.new_nether(),
+                    "end" => world.new_end(),
                     _ => {
                         continue;
                     }
                 };
-                let (b, a) = perimeter_count(region, (x, y, z));
+                let handle = std::thread::spawn(move || {
+                    let (b, a) = perimeter_count(&mut region, (x, y, z));
+                    (b, a)
+                });
+                let (b, a) = handle.join().unwrap_or((0, 0));
                 cache.insert("block_count".to_string(), b);
                 cache.insert("air_count".to_string(), a);
                 let response = format!("{} {}\n", b, a);
@@ -226,10 +242,9 @@ pub async fn run_anvil(
     };
     let mut cache: HashMap<String, u32> = HashMap::new();
     loop {
-        let mut world = World::new(world_path.clone());
         let instant = std::time::Instant::now();
         {
-            let prints = run_loop(&mut world, &mut cache).await;
+            let prints = run_loop(world_path.clone(), &mut cache).await;
             let duration_since_epoch = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or(std::time::Duration::new(0, 0))
