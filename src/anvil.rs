@@ -68,8 +68,8 @@ async fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<St
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
-        .stdin(tokio::process::Stdio::piped())
-        .stdout(tokio::process::Stdio::piped())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
         .spawn()
         .expect("Failed to start python script");
 
