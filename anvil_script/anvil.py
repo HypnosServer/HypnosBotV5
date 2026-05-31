@@ -70,7 +70,7 @@ def peri():
     block_cnt, air_cnt = get_perim("overworld", 1905, 94, -2865)
     percent = block_cnt / air_cnt
     left = air_cnt - block_cnt
-    print(f"Jepstein | ~{percent:.2f} done \\n {left} non-air left")
+    print(f"PRINT Jepstein | ~{percent:.2f} done \\n {left} non-air left")
 
 
 
