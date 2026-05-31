@@ -1,7 +1,7 @@
-use std::{collections::HashMap, io::{BufRead, Read, Write}, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, io::{BufRead, Read, Write}, path::PathBuf, process::Command, sync::{Arc, Mutex}};
 
 use poise::serenity_prelude::{ChannelId, Context, CreateEmbedFooter, CreateMessage, EditMessage, GuildId, Http, Message, MessageId};
-use tokio::{io::{AsyncBufReadExt, AsyncWriteExt}, process::Command, time::sleep};
+use tokio::time::sleep;
 use valence_anvil::RegionFolder;
 use valence_nbt::{Compound, Value};
 
@@ -11,7 +11,6 @@ struct World {
     ow: RegionFolder,
     nether: RegionFolder,
     end: RegionFolder,
-    world_path: PathBuf,
 }
 
 fn get_block(x: i64, y: i64, z: i64, chunk: Compound) -> Option<(u8, u8)> {
@@ -61,22 +60,11 @@ impl World {
         let nether = RegionFolder::new(world_path.join("DIM-1/region"));
         let end = RegionFolder::new(world_path.join("DIM1/region"));
 
-        World { ow, nether, end, world_path }
-    }
-
-    fn new_ow(&self) -> RegionFolder {
-        return RegionFolder::new(self.world_path.join("region"));
-    }
-    fn new_nether(&self) -> RegionFolder {
-        return RegionFolder::new(self.world_path.join("DIM-1/region"));
-    }
-    fn new_end(&self) -> RegionFolder {
-        return RegionFolder::new(self.world_path.join("DIM1/region"));
+        World { ow, nether, end }
     }
 }
 
-async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<String> {
-    let mut world = World::new(world_path);
+fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> {
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
@@ -88,7 +76,7 @@ async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<
     let mut stdin = child_process.stdin.take().expect("Failed to open stdin");
     let stdout = child_process.stdout.take().expect("Failed to open stdout");
 
-    let mut buf_reader = tokio::io::BufReader::new(stdout).lines();
+    let mut buf_reader = std::io::BufReader::new(stdout);
 
     // while child is running
     let mut prints = Vec::new();
@@ -102,9 +90,10 @@ async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<
             }
             break; // Exit the loop if the child process has exited
         }
-        let Ok(Some(input)) = buf_reader.next_line().await else {
-            break;
-        };
+        let mut input = String::new();
+        if let Err(_) = buf_reader.read_line(&mut input) {
+            break; // Exit the loop on error
+        }
         //let mut input_line = String::new();
         //if let Err(_) = std::io::stdin().read_line(&mut input_line) {
         //    break; // Exit the loop on error
@@ -151,7 +140,7 @@ async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<
                     if let Some((block_id, data)) = get_block(x, y, z, chunk.data) {
                         // Send the block ID and data to the python script
                         let response = format!("{} {}\n", block_id, data);
-                        if let Err(e) = stdin.write_all(response.as_bytes()).await {
+                        if let Err(e) = stdin.write_all(response.as_bytes()) {
                         }
                     }
                 }
@@ -164,7 +153,7 @@ async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<
                     let block_count = *cache.entry("block_count".to_string()).or_insert(0);
                     let air_count = *cache.entry("air_count".to_string()).or_insert(0);
                     let response = format!("{} {}\n", block_count, air_count);
-                    if let Err(e) = stdin.write_all(response.as_bytes()).await {
+                    if let Err(e) = stdin.write_all(response.as_bytes()) {
                     }
                     continue;
                 }
@@ -190,23 +179,19 @@ async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<
                         continue;
                     }
                 };
-                let mut region = match dim {
-                    "overworld" => world.new_ow(),
-                    "nether" => world.new_nether(),
-                    "end" => world.new_end(),
+                let region = match dim {
+                    "overworld" => &mut world.ow,
+                    "nether" => &mut world.nether,
+                    "end" => &mut world.end,
                     _ => {
                         continue;
                     }
                 };
-                let handle = std::thread::spawn(move || {
-                    let (b, a) = perimeter_count(&mut region, (x, y, z));
-                    (b, a)
-                });
-                let (b, a) = handle.join().unwrap_or((0, 0));
+                let (b, a) = perimeter_count(region, (x, y, z));
                 cache.insert("block_count".to_string(), b);
                 cache.insert("air_count".to_string(), a);
                 let response = format!("{} {}\n", b, a);
-                if let Err(e) = stdin.write_all(response.as_bytes()).await {
+                if let Err(e) = stdin.write_all(response.as_bytes()) {
                 }
             }
             "PRINT" => {
@@ -222,7 +207,7 @@ async fn run_loop(world_path: PathBuf, cache: &mut HashMap<String, u32>) -> Vec<
         }
     }
     // Wait for the child process to finish
-    if let Err(e) = child_process.wait().await {
+    if let Err(e) = child_process.wait() {
         eprintln!("Failed to wait for child process: {}", e);
     }
     prints
@@ -240,11 +225,17 @@ pub async fn run_anvil(
             .expect("World path not found for SMP");
         (channel, PathBuf::from(world_path))
     };
-    let mut cache: HashMap<String, u32> = HashMap::new();
+    let cache: Arc<Mutex<HashMap<String, u32>>> = Arc::new(Mutex::new(HashMap::new()));
     loop {
+        let mut world = World::new(world_path.clone());
         let instant = std::time::Instant::now();
         {
-            let prints = run_loop(world_path.clone(), &mut cache).await;
+            let cache = cache.clone();
+            let handle = std::thread::spawn(move || {
+                let mut cache = cache.lock().unwrap();
+                run_loop(&mut world, &mut cache)
+            });
+            let prints = handle.join().unwrap_or_else(|_| Vec::new());
             let duration_since_epoch = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or(std::time::Duration::new(0, 0))
