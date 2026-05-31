@@ -10,6 +10,16 @@ def get_block(dim, x, y, z) -> tuple:
         sys.exit(1)
     return int(block_id), int(block_meta)
 
+def get_perim(dim, x, y, z) -> tuple:
+    print(f"PERIM {dim} {x} {y} {z}")
+    stats = input()
+    try:
+        block_cnt, air_cnt = metadata.split()
+    except e:
+        sys.exit(1)
+    return int(block_cnt), int(air_cnt)
+
+
 def ow_mobswitch():
     block_id, block_meta = get_block("overworld", 19, 6, 397)
     if block_id == 55 and block_meta == 15:
@@ -56,11 +66,16 @@ def leaderboard():
         string += f"{player}: {gain}\\n"
     print(string)
 
-
+def peri():
+    block_cnt, air_cnt = get_peri("overworld", 1905, 94, -2865)
+    percent = block_cnt / air_cnt
+    left = air_cnt - block_cnt
+    print(f"Jepstein | ~{percent:.2f} done \\n {left} non-air left")
 
 
 
 ow_mobswitch()
 nether_mobswitch()
 eps_storage()
+peri()
 leaderboard()
