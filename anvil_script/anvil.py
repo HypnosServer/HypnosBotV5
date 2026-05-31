@@ -68,8 +68,8 @@ def leaderboard():
 
 def peri():
     block_cnt, air_cnt = get_perim("overworld", 1905, 94, -2865)
-    percent = (block_cnt / air_cnt) * 100
-    left = air_cnt - block_cnt
+    percent = (air_cnt / block_cnt) * 100
+    left = block_cnt - air_cnt
     print(f"PRINT Jepstein | ~{percent:.2f} done \\n {left} non-air left")
 
 
