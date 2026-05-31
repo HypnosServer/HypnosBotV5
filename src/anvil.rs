@@ -1,7 +1,7 @@
-use std::{collections::HashMap, io::{BufRead, Read, Write}, path::PathBuf, process::Command, sync::Arc};
+use std::{collections::HashMap, io::{BufRead, Read, Write}, path::PathBuf, sync::Arc};
 
 use poise::serenity_prelude::{ChannelId, Context, CreateEmbedFooter, CreateMessage, EditMessage, GuildId, Http, Message, MessageId};
-use tokio::time::sleep;
+use tokio::{io::{AsyncBufReadExt, AsyncWriteExt}, process::Command, time::sleep};
 use valence_anvil::RegionFolder;
 use valence_nbt::{Compound, Value};
 
@@ -64,19 +64,19 @@ impl World {
     }
 }
 
-fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> {
+async fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> {
     let mut child_process = Command::new("/usr/bin/env")
         .arg("python3")
         .arg("anvil_script/anvil.py")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
+        .stdin(tokio::process::Stdio::piped())
+        .stdout(tokio::process::Stdio::piped())
         .spawn()
         .expect("Failed to start python script");
 
     let mut stdin = child_process.stdin.take().expect("Failed to open stdin");
     let stdout = child_process.stdout.take().expect("Failed to open stdout");
 
-    let mut buf_reader = std::io::BufReader::new(stdout);
+    let mut buf_reader = tokio::io::BufReader::new(stdout).lines();
 
     // while child is running
     let mut prints = Vec::new();
@@ -90,10 +90,9 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
             }
             break; // Exit the loop if the child process has exited
         }
-        let mut input = String::new();
-        if let Err(_) = buf_reader.read_line(&mut input) {
-            break; // Exit the loop on error
-        }
+        let Ok(Some(input)) = buf_reader.next_line().await else {
+            break;
+        };
         //let mut input_line = String::new();
         //if let Err(_) = std::io::stdin().read_line(&mut input_line) {
         //    break; // Exit the loop on error
@@ -140,7 +139,7 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
                     if let Some((block_id, data)) = get_block(x, y, z, chunk.data) {
                         // Send the block ID and data to the python script
                         let response = format!("{} {}\n", block_id, data);
-                        if let Err(e) = stdin.write_all(response.as_bytes()) {
+                        if let Err(e) = stdin.write_all(response.as_bytes()).await {
                         }
                     }
                 }
@@ -153,7 +152,7 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
                     let block_count = *cache.entry("block_count".to_string()).or_insert(0);
                     let air_count = *cache.entry("air_count".to_string()).or_insert(0);
                     let response = format!("{} {}\n", block_count, air_count);
-                    if let Err(e) = stdin.write_all(response.as_bytes()) {
+                    if let Err(e) = stdin.write_all(response.as_bytes()).await {
                     }
                     continue;
                 }
@@ -191,7 +190,7 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
                 cache.insert("block_count".to_string(), b);
                 cache.insert("air_count".to_string(), a);
                 let response = format!("{} {}\n", b, a);
-                if let Err(e) = stdin.write_all(response.as_bytes()) {
+                if let Err(e) = stdin.write_all(response.as_bytes()).await {
                 }
             }
             "PRINT" => {
@@ -207,7 +206,7 @@ fn run_loop(world: &mut World, cache: &mut HashMap<String, u32>) -> Vec<String> 
         }
     }
     // Wait for the child process to finish
-    if let Err(e) = child_process.wait() {
+    if let Err(e) = child_process.wait().await {
         eprintln!("Failed to wait for child process: {}", e);
     }
     prints
@@ -230,7 +229,7 @@ pub async fn run_anvil(
         let mut world = World::new(world_path.clone());
         let instant = std::time::Instant::now();
         {
-            let prints = run_loop(&mut world, &mut cache);
+            let prints = run_loop(&mut world, &mut cache).await;
             let duration_since_epoch = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or(std::time::Duration::new(0, 0))
