@@ -78,7 +78,7 @@ def leaderboard():
         player = stat['player']
         gain = stat ['gain']
         string += f"{player}: {gain}\\n"
-    monday = get_next_monda()
+    monday = get_next_monday()
     string += f"Resets <t:{unix_timestamp}:F>"
     print(string)
 
