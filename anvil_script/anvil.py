@@ -79,7 +79,7 @@ def leaderboard():
         gain = stat ['gain']
         string += f"{player}: {gain}\\n"
     monday = get_next_monday()
-    string += f"Resets <t:{unix_timestamp}:F>"
+    string += f"Resets <t:{monday}:F>"
     print(string)
 
 def peri():
