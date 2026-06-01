@@ -1,5 +1,6 @@
 import sys
 import requests
+from datetime import datetime, timedelta, timezone
 
 def get_block(dim, x, y, z) -> tuple:
     print(f"GET {dim} {x} {y} {z}")
@@ -56,6 +57,19 @@ def eps_storage():
 
     print(f"PRINT EPS Storage | Gunpowder: {gp_10}{gp_1}.{gp_dec}M ({gp_percent_10}{gp_percent_1}%), Bones: {bone_10}{bone_1}.{bone_dec}M ({bone_percent_10}{bone_percent_1}%)")
 
+def get_next_monday():
+    now = datetime.now(timezone.utc)
+
+    days_ahead = (7 - now.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7  # Always get the *next* Monday
+
+    next_monday = (now + timedelta(days=days_ahead)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    unix_timestamp = int(next_monday.timestamp())
+    return unix_timestamp
+
 def leaderboard():
     r = requests.get("http://localhost:11002/api/weekly?objectives=dugged,u.diamond_shovel")
     js = r.json()
@@ -64,6 +78,8 @@ def leaderboard():
         player = stat['player']
         gain = stat ['gain']
         string += f"{player}: {gain}\\n"
+    monday = get_next_monda()
+    string += f"Resets <t:{unix_timestamp}:F>"
     print(string)
 
 def peri():
