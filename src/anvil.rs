@@ -231,11 +231,10 @@ pub async fn run_anvil(
         let instant = std::time::Instant::now();
         {
             let cache = cache.clone();
-            let handle = std::thread::spawn(move || {
+            let prints = tokio::task::spawn_blocking(move || {
                 let mut cache = cache.lock().unwrap();
                 run_loop(&mut world, &mut cache)
-            });
-            let prints = handle.join().unwrap_or_else(|_| Vec::new());
+            }).await.unwrap();
             let duration_since_epoch = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or(std::time::Duration::new(0, 0))
